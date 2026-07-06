@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { Artifact, ArtifactKind, Ingested, Publication, RendererRef, Source } from "./types.ts";
+import type { Artifact, ArtifactKind, Ingested, Publication, RendererRef, Source, SourceContext } from "./types.ts";
 
 export interface PublishParams {
   ingested: Ingested;
@@ -14,6 +14,7 @@ export interface PublishParams {
   renderer?: RendererRef;
   sourceType: Source["type"];
   sourceLabel?: string;
+  context?: SourceContext;
 }
 
 export interface ListParams {
@@ -37,6 +38,7 @@ interface PublicationRow {
   created_at: string;
   updated_at: string;
   latest_kind?: string;
+  latest_context?: string;
 }
 
 interface ArtifactRow {
@@ -50,6 +52,7 @@ interface ArtifactRow {
   size_bytes: number;
   source_type: string;
   source_label: string | null;
+  context_json: string | null;
   renderer_json: string;
   created_at: string;
 }
@@ -85,12 +88,18 @@ export class Registry {
         size_bytes INTEGER NOT NULL DEFAULT 0,
         source_type TEXT NOT NULL,
         source_label TEXT,
+        context_json TEXT NOT NULL DEFAULT '{}',
         renderer_json TEXT NOT NULL DEFAULT '{}',
         created_at TEXT NOT NULL,
         FOREIGN KEY(publication_id) REFERENCES publications(id)
       );
       CREATE INDEX IF NOT EXISTS idx_artifacts_pub ON artifacts(publication_id, created_at);
     `);
+    try {
+      this.db.exec(`ALTER TABLE artifacts ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`);
+    } catch {
+      // column already exists
+    }
   }
 
   private one<T>(sql: string, ...bind: (string | number | null)[]): T | undefined {
@@ -102,7 +111,7 @@ export class Registry {
   }
 
   publish(params: PublishParams): { publication: Publication; artifact: Artifact } {
-    const { ingested, description, updateExisting = false, tags = [], renderer = {}, sourceType, sourceLabel } = params;
+    const { ingested, description, updateExisting = false, tags = [], renderer = {}, sourceType, sourceLabel, context = {} } = params;
     const now = new Date().toISOString();
     const explicitSlug = Boolean(params.slug);
     let slug = slugify(params.slug ?? params.title ?? ingested.filename);
@@ -144,8 +153,8 @@ export class Registry {
     this.db
       .prepare(
         `INSERT INTO artifacts (id, publication_id, kind, mime_type, sha256, title, filename, size_bytes,
-         source_type, source_label, renderer_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         source_type, source_label, context_json, renderer_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         ingested.id,
@@ -158,6 +167,7 @@ export class Registry {
         ingested.sizeBytes,
         sourceType,
         sourceLabel ?? null,
+        JSON.stringify(context),
         JSON.stringify(renderer),
         now
       );
@@ -216,7 +226,7 @@ export class Registry {
     }
 
     const rows = this.many<PublicationRow>(
-      `SELECT p.*, a.kind AS latest_kind FROM publications p
+      `SELECT p.*, a.kind AS latest_kind, a.context_json AS latest_context FROM publications p
        JOIN artifacts a ON a.id = p.latest_artifact_id
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
        ORDER BY p.pinned DESC, ${col} ${dir} LIMIT ? OFFSET ?`,
@@ -248,6 +258,7 @@ export class Registry {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       kind: row.latest_kind as ArtifactKind | undefined,
+      context: row.latest_context ? JSON.parse(row.latest_context) : undefined,
     };
   }
 
@@ -281,6 +292,7 @@ function artifactFromRow(row: ArtifactRow): Artifact {
     filename: row.filename,
     sizeBytes: row.size_bytes,
     source: { type: row.source_type as Source["type"], label: row.source_label ?? undefined },
+    context: JSON.parse(row.context_json ?? "{}"),
     renderer: JSON.parse(row.renderer_json),
     createdAt: row.created_at,
   };

@@ -7,6 +7,7 @@ import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry
 import { startHttp, type Deps } from "../src/http.ts";
 import { createMcpServer } from "../src/mcp.ts";
 import { readServerInfo } from "../src/server-info.ts";
+import { captureContext } from "../src/provenance.ts";
 
 const USAGE = `serve-mcp — local MCP-controlled artifact shelf
 
@@ -101,6 +102,7 @@ if (cmd === "mcp") {
     tags: values.tag ?? [],
     sourceType: "path",
     sourceLabel: target,
+    context: captureContext({ type: "path", path: target }),
   });
   console.log(publicationWithUrls(publication, baseUrl).previewUrl);
   console.log(`raw: ${artifactWithUrls(artifact, baseUrl).rawUrl}`);

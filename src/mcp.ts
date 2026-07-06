@@ -3,6 +3,7 @@ import { z } from "zod";
 import { KINDS } from "./types.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
 import { baseUrlOf } from "./config.ts";
+import { captureContext } from "./provenance.ts";
 import type { ArtifactStore } from "./store.ts";
 import type { Config } from "./types.ts";
 
@@ -105,6 +106,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
           renderer: input.renderer,
           sourceType: source.type,
           sourceLabel: source.type === "content" ? source.filename : source.path,
+          context: captureContext(source),
         });
       } catch (err) {
         return errorResult((err as Error).message);

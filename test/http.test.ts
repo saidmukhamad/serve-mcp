@@ -72,6 +72,32 @@ test("html artifact served in no-script frame; allowScripts loosens sandbox", as
   cleanup();
 });
 
+test("shell and gallery show description and git provenance", async () => {
+  const { store, registry, get, cleanup } = setup();
+  const ing = store.ingest({ type: "content", content: "# r", filename: "report.md" });
+  registry.publish({
+    ingested: ing,
+    title: "Prov Report",
+    description: "Weekly numbers",
+    sourceType: "path",
+    sourceLabel: "./report.md",
+    context: {
+      path: "/home/dev/proj/report.md",
+      git: { branch: "main", remote: "git@github.com:acme/widgets.git", commit: "a".repeat(40) },
+    },
+  });
+
+  const shell = await (await get("/p/prov-report")).text();
+  assert.match(shell, /Weekly numbers/);
+  assert.match(shell, /from <code>\/home\/dev\/proj\/report\.md<\/code>/);
+  assert.match(shell, /github\.com\/acme\/widgets<\/code> @ main/);
+
+  const gallery = await (await get("/")).text();
+  assert.match(gallery, /Weekly numbers/);
+  assert.match(gallery, /github\.com\/acme\/widgets/);
+  cleanup();
+});
+
 test("markdown external links open in a new tab; internal links stay in-frame", async () => {
   const { store, registry, get, cleanup } = setup();
   const ing = store.ingest({

@@ -152,7 +152,7 @@ const DOC_CSS = `
   input[type=checkbox] { accent-color: #0b62d6; }
 `;
 
-export function htmlDoc(title: string, css: string, bodyHtml: string): string {
+export function htmlDoc(title: string, css: string, bodyHtml: string, bodyAttrs = ""): string {
   return `<!doctype html>
 <html>
 <head>
@@ -161,7 +161,7 @@ export function htmlDoc(title: string, css: string, bodyHtml: string): string {
 ${title ? `<title>${escapeHtml(title)}</title>` : ""}
 <style>${css}</style>
 </head>
-<body>
+<body${bodyAttrs ? ` ${bodyAttrs}` : ""}>
 ${bodyHtml}
 </body>
 </html>`;

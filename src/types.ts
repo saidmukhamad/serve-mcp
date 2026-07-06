@@ -23,6 +23,19 @@ export interface RendererRef {
   options?: { allowScripts?: boolean; [key: string]: unknown };
 }
 
+export interface GitInfo {
+  branch?: string;
+  remote?: string;
+  commit?: string;
+}
+
+/** Where a publish came from: the source path or publisher cwd, plus git provenance. */
+export interface SourceContext {
+  path?: string;
+  cwd?: string;
+  git?: GitInfo;
+}
+
 export interface Ingested {
   id: string;
   kind: ArtifactKind;
@@ -36,6 +49,7 @@ export interface Artifact extends Ingested {
   publicationId: string;
   title: string;
   source: { type: Source["type"]; label?: string };
+  context: SourceContext;
   renderer: RendererRef;
   createdAt: string;
 }
@@ -52,6 +66,8 @@ export interface Publication {
   createdAt: string;
   updatedAt: string;
   kind?: ArtifactKind;
+  /** Context of the latest revision, when loaded via listPublications. */
+  context?: SourceContext;
 }
 
 export interface Config {

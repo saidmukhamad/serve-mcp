@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { serve, type ServerType } from "@hono/node-server";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { detectMime, FOLDER_INDEXES } from "./kinds.ts";
 import { advertiseHost, baseUrlOf } from "./config.ts";
@@ -8,7 +9,7 @@ import { isCgnat, resolveTailnetDnsName } from "./tailnet.ts";
 import { writeServerInfo } from "./server-info.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
 import type { ArtifactStore } from "./store.ts";
-import type { Artifact, Config, Publication } from "./types.ts";
+import type { Artifact, Config, Publication, SourceContext } from "./types.ts";
 import {
   renderArtifact,
   renderMarkdown,
@@ -219,13 +220,48 @@ const UI_CSS = `
   .tag { font-size: 0.72rem; color: light-dark(#0b62d6, #7ab8ff); }
   h2.section { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em;
                color: light-dark(#8a8a94, #77777f); margin: 1.6rem 0 0.2rem; }
-  iframe.preview { display: block; width: 100%; height: calc(100vh - 49px); border: 0;
+  body.shell { display: flex; flex-direction: column; height: 100vh; }
+  iframe.preview { display: block; width: 100%; flex: 1; border: 0;
                    background: light-dark(#fff, #16161a); }
+  .subbar { display: flex; flex-wrap: wrap; gap: 0.6rem; padding: 0.4rem 1.1rem; font-size: 0.82rem;
+            color: light-dark(#777782, #8b8b96); background: light-dark(#ffffff, #17171c);
+            border-bottom: 1px solid light-dark(#e4e4ea, #26262e); }
+  .subbar code { background: light-dark(#f0f0f3, #26262e); padding: 0.05em 0.35em; border-radius: 4px;
+                 font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .prov { font-size: 0.78rem; color: light-dark(#8a8a94, #77777f); }
   .empty { text-align: center; padding: 4rem 0; }
 `;
 
-function page(title: string, body: string): string {
-  return htmlDoc(title, UI_CSS, body);
+function page(title: string, body: string, bodyAttrs = ""): string {
+  return htmlDoc(title, UI_CSS, body, bodyAttrs);
+}
+
+function tildify(p: string): string {
+  const home = os.homedir();
+  return p.startsWith(home) ? `~${p.slice(home.length)}` : p;
+}
+
+/** git@github.com:user/repo.git and https URLs both display as github.com/user/repo */
+function shortRemote(url: string): string {
+  return url
+    .replace(/^\w+:\/\//, "")
+    .replace(/^git@/, "")
+    .replace(":", "/")
+    .replace(/\.git$/, "");
+}
+
+function provenanceBits(context: SourceContext | undefined): string[] {
+  if (!context) return [];
+  const bits: string[] = [];
+  const from = context.path ?? context.cwd;
+  if (from) bits.push(`from <code>${escapeHtml(tildify(from))}</code>`);
+  if (context.git?.remote) {
+    const branch = context.git.branch ? ` @ ${escapeHtml(context.git.branch)}` : "";
+    bits.push(`<code>${escapeHtml(shortRemote(context.git.remote))}</code>${branch}`);
+  } else if (context.git?.branch) {
+    bits.push(`branch <code>${escapeHtml(context.git.branch)}</code>`);
+  }
+  return bits;
 }
 
 function relTime(iso: string): string {
@@ -262,6 +298,7 @@ function galleryPage(pubs: Publication[], q?: string): string {
       <div style="min-width:0">
         <a class="title" href="/p/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a>
         ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ""}
+        ${provenanceBits(p.context).length ? `<div class="prov">${provenanceBits(p.context).join(" · ")}</div>` : ""}
         <div class="muted">${p.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join(" ")}</div>
       </div>
       <div class="spacer"></div>
@@ -292,6 +329,10 @@ function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, isRevi
   const revLinks = pub.revisions
     .map((id, i) => `<a href="/p/${escapeHtml(pub.slug)}/r/${escapeHtml(id)}">r${i + 1}</a>`)
     .join(" · ");
+  const subBits = [
+    pub.description ? escapeHtml(pub.description) : "",
+    ...provenanceBits(artifact.context),
+  ].filter(Boolean);
   const body = `
   <header class="bar">
     <a href="/" title="back to shelf">←</a>
@@ -304,6 +345,7 @@ function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, isRevi
     <a class="btn" href="/raw/${escapeHtml(artifact.id)}">Raw</a>
     <button class="btn" onclick="navigator.clipboard.writeText('${escapeHtml(baseUrl)}/p/${escapeHtml(pub.slug)}').then(()=>{this.textContent='Copied';setTimeout(()=>this.textContent='Copy URL',1200)})">Copy URL</button>
   </header>
+  ${subBits.length ? `<div class="subbar">${subBits.join(" · ")}</div>` : ""}
   <iframe class="preview" sandbox="${sandboxFor(artifact)}" src="${frameSrc}"></iframe>`;
-  return page(pub.title, body);
+  return page(pub.title, body, 'class="shell"');
 }
