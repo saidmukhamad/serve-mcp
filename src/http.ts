@@ -18,6 +18,7 @@ import {
   sandboxFor,
   escapeHtml,
   docShell,
+  htmlDoc,
   FRAME_CSP,
 } from "./render.ts";
 import { StreamableHTTPTransport } from "@hono/mcp";
@@ -31,6 +32,11 @@ export interface Deps {
 
 const SHELL_CSP =
   "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'";
+
+function send(c: Context, body: string | Buffer, contentType: string) {
+  c.header("Content-Type", contentType);
+  return typeof body === "string" ? c.body(body) : c.body(body as Uint8Array<ArrayBuffer>);
+}
 
 export function createApp({ registry, store, config }: Deps): Hono {
   const app = new Hono();
@@ -71,8 +77,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     const raw = store.readSource(artifact.id, artifact.filename);
     const { body, contentType } = await renderArtifact(artifact, raw);
     c.header("Content-Security-Policy", cspFor(artifact));
-    c.header("Content-Type", contentType);
-    return c.body(body as unknown as ArrayBuffer);
+    return send(c, body, contentType);
   });
 
   app.get("/frame/:artifactId/*", async (c) => {
@@ -95,8 +100,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
         artifact.title,
         listingHtml(rel, store.listFolder(artifact.id, rel === "" ? "." : rel))
       );
-      c.header("Content-Type", contentType);
-      return c.body(body as unknown as ArrayBuffer);
+      return send(c, body, contentType);
     }
     return serveFolderFile(c, entry.abs);
   });
@@ -114,16 +118,14 @@ export function createApp({ registry, store, config }: Deps): Hono {
             ? renderJson(fs.readFileSync(abs, "utf8"), name)
             : null;
     if (rendered) {
-      const withRawLink = String(rendered.body).replace(
+      const withRawLink = rendered.body.replace(
         "</body>",
         `<p class="muted" style="text-align:center"><a href="?raw" download>download ${escapeHtml(name)}</a></p></body>`
       );
-      c.header("Content-Type", rendered.contentType);
-      return c.body(withRawLink as unknown as ArrayBuffer);
+      return send(c, withRawLink, rendered.contentType);
     }
-    c.header("Content-Type", detectMime(name));
     if (wantsRaw) c.header("Content-Disposition", `attachment; filename="${name.replace(/[^\w.\-]/g, "_")}"`);
-    return c.body(fs.readFileSync(abs) as unknown as ArrayBuffer);
+    return send(c, fs.readFileSync(abs), detectMime(name));
   }
 
   app.get("/raw/:artifactId", (c) => {
@@ -135,12 +137,11 @@ export function createApp({ registry, store, config }: Deps): Hono {
     const raw = store.readSource(artifact.id, artifact.filename);
     c.header("Content-Security-Policy", FRAME_CSP);
     const mime = artifact.mimeType === "text/html" ? "text/plain; charset=utf-8" : artifact.mimeType;
-    c.header("Content-Type", mime);
-    return c.body(raw as unknown as ArrayBuffer);
+    return send(c, raw, mime);
   });
 
-  app.get("/meta/:artifactId", (c) => {
-    const artifact = registry.getArtifact(c.req.param("artifactId"));
+  app.on("GET", ["/meta/:id", "/api/artifacts/:id"], (c) => {
+    const artifact = registry.getArtifact(c.req.param("id"));
     if (!artifact) return c.json({ error: "artifact not found" }, 404);
     return c.json(artifactWithUrls(artifact, base()));
   });
@@ -155,12 +156,6 @@ export function createApp({ registry, store, config }: Deps): Hono {
       publications: publications.map((p) => publicationWithUrls(p, base())),
       nextCursor,
     });
-  });
-
-  app.get("/api/artifacts/:id", (c) => {
-    const artifact = registry.getArtifact(c.req.param("id"));
-    if (!artifact) return c.json({ error: "artifact not found" }, 404);
-    return c.json(artifactWithUrls(artifact, base()));
   });
 
   app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp" }));
@@ -234,18 +229,7 @@ const UI_CSS = `
 `;
 
 function page(title: string, body: string): string {
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)}</title>
-<style>${UI_CSS}</style>
-</head>
-<body>
-${body}
-</body>
-</html>`;
+  return htmlDoc(title, UI_CSS, body);
 }
 
 function relTime(iso: string): string {
@@ -298,8 +282,7 @@ function galleryPage(pubs: Publication[], q?: string): string {
   <main class="gallery">
     <form class="search" method="get" action="/"><input name="q" placeholder="Search artifacts…" value="${escapeHtml(q ?? "")}"></form>
     ${pubs.length === 0 ? `<div class="empty muted">Nothing published yet. Agents publish with the <code>artifact_publish</code> MCP tool.</div>` : ""}
-    ${section("Pinned", pinned)}
-    ${section(pinned.length ? "Recent" : "", rest) || (pinned.length === 0 ? rest.map(card).join("\n") : "")}
+    ${pinned.length ? section("Pinned", pinned) + section("Recent", rest) : rest.map(card).join("\n")}
   </main>`;
   return page("serve-mcp · artifact shelf", body);
 }

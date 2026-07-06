@@ -1,5 +1,5 @@
 import { markdownToHtml } from "satteri";
-import type { Artifact, Rendered, RendererRef } from "./types.ts";
+import type { Artifact, Rendered } from "./types.ts";
 
 // Rendered content is always embedded via a sandboxed iframe; scripts stay
 // blocked by CSP unless the artifact opted in with renderer.options.allowScripts.
@@ -9,9 +9,7 @@ export const FRAME_CSP =
 export const FRAME_CSP_SCRIPTS =
   "default-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self'; script-src 'unsafe-inline' 'self'; connect-src 'self'";
 
-interface RendererCarrier {
-  renderer: RendererRef;
-}
+type RendererCarrier = Pick<Artifact, "renderer">;
 
 export function allowsScripts(artifact: RendererCarrier): boolean {
   return artifact.renderer?.options?.allowScripts === true;
@@ -37,7 +35,7 @@ export async function renderArtifact(artifact: Artifact, raw: Buffer): Promise<R
     case "html":
       return { body: raw.toString("utf8"), contentType: "text/html; charset=utf-8" };
     case "svg":
-      return { body: raw, contentType: "image/svg+xml" };
+      return { body: raw.toString("utf8"), contentType: "image/svg+xml" };
     case "image":
       return docShell(
         artifact.title,
@@ -154,18 +152,21 @@ const DOC_CSS = `
   input[type=checkbox] { accent-color: #0b62d6; }
 `;
 
-export function docShell(title: string, bodyHtml: string): Rendered {
-  const body = `<!doctype html>
+export function htmlDoc(title: string, css: string, bodyHtml: string): string {
+  return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${title ? `<title>${escapeHtml(title)}</title>` : ""}
-<style>${DOC_CSS}</style>
+<style>${css}</style>
 </head>
 <body>
 ${bodyHtml}
 </body>
 </html>`;
-  return { body, contentType: "text/html; charset=utf-8" };
+}
+
+export function docShell(title: string, bodyHtml: string): Rendered {
+  return { body: htmlDoc(title, DOC_CSS, bodyHtml), contentType: "text/html; charset=utf-8" };
 }

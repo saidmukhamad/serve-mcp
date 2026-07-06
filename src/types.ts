@@ -66,6 +66,6 @@ export interface Config {
 }
 
 export interface Rendered {
-  body: string | Buffer;
+  body: string;
   contentType: string;
 }

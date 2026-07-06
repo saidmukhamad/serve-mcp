@@ -12,8 +12,8 @@ export class ArtifactStore {
     fs.mkdirSync(this.root, { recursive: true });
   }
 
-  newId(prefix = "art"): string {
-    return `${prefix}_${randomBytes(9).toString("base64url")}`;
+  newId(): string {
+    return `art_${randomBytes(9).toString("base64url")}`;
   }
 
   dirFor(artifactId: string): string {
@@ -110,11 +110,6 @@ export class ArtifactStore {
 
   readSource(artifactId: string, filename: string): Buffer {
     return fs.readFileSync(this.sourcePath(artifactId, filename));
-  }
-
-  resolveFolderFile(artifactId: string, relPath: string): string | null {
-    const entry = this.statFolderPath(artifactId, relPath);
-    return entry?.type === "file" ? entry.abs : null;
   }
 
   statFolderPath(artifactId: string, relPath: string): { abs: string; type: "file" | "dir" } | null {

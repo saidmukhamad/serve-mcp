@@ -29,8 +29,3 @@ export function readServerInfo(dataDir: string): ServerInfo | null {
     return null;
   }
 }
-
-export function clearServerInfo(dataDir: string): void {
-  const existing = readServerInfo(dataDir);
-  if (existing && existing.pid === process.pid) fs.rmSync(infoPath(dataDir), { force: true });
-}

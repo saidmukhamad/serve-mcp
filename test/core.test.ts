@@ -34,7 +34,7 @@ test("store ingests content and rejects traversal", () => {
   assert.equal(ing.kind, "markdown");
   assert.equal(store.readSource(ing.id, ing.filename).toString(), "# t");
   assert.throws(() => store.readSource(ing.id, "../../etc/passwd"));
-  assert.equal(store.resolveFolderFile(ing.id, "../secret"), null);
+  assert.equal(store.statFolderPath(ing.id, "../secret"), null);
   cleanup();
 });
 
@@ -47,7 +47,7 @@ test("store ingests folders with entrypoint detection", () => {
   const ing = store.ingest({ type: "folder", path: site });
   assert.equal(ing.kind, "static-folder");
   assert.equal(ing.filename, "files/index.html");
-  assert.ok(store.resolveFolderFile(ing.id, "style.css"));
+  assert.equal(store.statFolderPath(ing.id, "style.css")?.type, "file");
   cleanup();
 });
 
