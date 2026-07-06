@@ -79,7 +79,8 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       title: "Publish artifact",
       description:
         "Snapshot a file, folder, or inline content into the artifact shelf and get a stable browser preview URL back. " +
-        "Use the same slug with updateExisting:true to push new revisions of the same page.",
+        "Use the same slug with updateExisting:true to push new revisions of the same page. " +
+        "path/folder sources are read from the machine running the shelf; over remote MCP connections use content sources.",
       inputSchema: publishInput,
     },
     async (input) => {

@@ -105,6 +105,17 @@ SERVE_MCP_ALLOWED_ROOTS  colon-separated roots for path/folder publishing (defau
 
 `--port` and `--host` flags on `serve`/`mcp` override the env.
 
+## MCP over HTTP (experimental)
+
+The shelf also speaks MCP at `<baseUrl>/mcp` (Streamable HTTP transport, stateless). Combined with `--host 0.0.0.0`, agents on *other* machines can use this shelf directly:
+
+```bash
+# on machine B, pointing at machine A's shelf over the tailnet
+claude mcp add shelf-a --transport http http://100.x.y.z:7331/mcp
+```
+
+Run a shelf on each machine and point them at each other, and publishing works in both directions. Caveat: `path`/`folder` sources are read from the filesystem of the machine *running the shelf* — remote publishers should use `content` sources. Tailnet detection needs no Tailscale tooling.
+
 ## Non-goals
 
 Not a CDN, not a deploy platform, not a filesystem browser, not a CMS. It does one thing: **publish generated artifacts → render safely → remember them → list them.**

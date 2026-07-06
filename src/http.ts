@@ -17,6 +17,8 @@ import {
   docShell,
   FRAME_CSP,
 } from "./render.ts";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { createMcpServer } from "./mcp.ts";
 
 export interface Deps {
   registry: Registry;
@@ -144,6 +146,16 @@ export function createApp({ registry, store, config }: Deps): Hono {
   });
 
   app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp" }));
+
+  // MCP over HTTP: lets other machines add this shelf as an MCP server
+  // (claude mcp add --transport http shelf <baseUrl>/mcp). Stateless — one
+  // transport per request.
+  app.all("/mcp", async (c) => {
+    const transport = new StreamableHTTPTransport({ sessionIdGenerator: undefined });
+    const mcp = createMcpServer({ registry, store, config });
+    await mcp.connect(transport);
+    return (await transport.handleRequest(c)) ?? c.body(null, 406);
+  });
 
   return app;
 }
