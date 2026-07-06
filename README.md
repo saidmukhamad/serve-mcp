@@ -73,7 +73,7 @@ GET /api/publications       JSON list
 
 Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`) — nothing serves from your workspace, and revisions are immutable. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter). HTML, Markdown output, and SVG are always served inside a sandboxed iframe with `Content-Security-Policy: script-src 'none'` — agent-generated content cannot run scripts, phone home, or touch cookies. Scripts require an explicit opt-in per artifact (`renderer.options.allowScripts: true`), which loosens the sandbox to `allow-scripts` for that artifact only. The server binds `127.0.0.1` only. Path publishing can be restricted with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 
-JSON pretty-prints, CSV becomes a table, folders serve as static sites behind the same sandbox (entrypoint: `index.html` or `README.md`, or pass `entrypoint`).
+JSON pretty-prints, CSV becomes a table, folders serve as static sites behind the same sandbox. Folder navigation works like a classic file server: each directory serves its own `index.html`/`index.md`/`README.md` (or pass `entrypoint`), `dir` redirects to `dir/` so relative and `../` links resolve, and directories without an index get a browsable listing with a `../` entry. In-folder Markdown renders on the fly, so `.md` files can link to each other across directories.
 
 ## CLI
 
@@ -102,8 +102,9 @@ Not a CDN, not a deploy platform, not a filesystem browser, not a CMS. It does o
 
 ```bash
 npm install
-npm test          # node:test — core, http, mcp round-trip
+npm test          # typecheck + node:test — core, http, mcp round-trip
 npm start         # HTTP server
+npm run build     # tsc -> dist/ (what npm ships)
 ```
 
-Requires Node ≥ 22.5 (uses built-in `node:sqlite`). MIT.
+Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. Requires Node ≥ 22.18 (type stripping + built-in `node:sqlite`). MIT.
