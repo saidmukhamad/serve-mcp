@@ -9,6 +9,11 @@ export const FRAME_CSP =
 export const FRAME_CSP_SCRIPTS =
   "default-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self'; script-src 'unsafe-inline' 'self'; connect-src 'self'";
 
+/** Only the two mermaid script tags carry the nonce; injected scripts stay blocked. */
+export function mermaidCsp(nonce: string): string {
+  return `default-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'nonce-${nonce}'`;
+}
+
 type RendererCarrier = Pick<Artifact, "renderer">;
 
 export function allowsScripts(artifact: RendererCarrier): boolean {
@@ -55,9 +60,29 @@ export async function renderArtifact(artifact: Artifact, raw: Buffer): Promise<R
   }
 }
 
-export async function renderMarkdown(md: string): Promise<Rendered> {
+export function hasMermaid(md: string): boolean {
+  return /^```mermaid\s*$/m.test(md);
+}
+
+/**
+ * With a nonce, mermaid blocks become live diagrams: the frame gets our
+ * vendored mermaid.js + init, both nonce-gated by CSP so markdown-injected
+ * scripts still never run. Without a nonce they stay plain code blocks.
+ */
+export async function renderMarkdown(md: string, mermaidNonce?: string): Promise<Rendered> {
   const { html } = await markdownToHtml(md, { features: { gfm: true, frontmatter: true } });
-  return docShell("", `<article class="prose">${externalLinksInNewTab(html)}</article>`);
+  let body = externalLinksInNewTab(html);
+  let scripts = "";
+  if (mermaidNonce && hasMermaid(md)) {
+    body = body.replace(
+      /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g,
+      `<pre class="mermaid">$1</pre>`
+    );
+    scripts = `
+<script nonce="${mermaidNonce}" src="/vendor/mermaid.js"></script>
+<script nonce="${mermaidNonce}">mermaid.initialize({ startOnLoad: true, securityLevel: "strict", theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });</script>`;
+  }
+  return docShell("", `<article class="prose">${body}</article>${scripts}`);
 }
 
 function externalLinksInNewTab(html: string): string {

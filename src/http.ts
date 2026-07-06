@@ -20,8 +20,14 @@ import {
   escapeHtml,
   docShell,
   htmlDoc,
+  hasMermaid,
+  mermaidCsp,
   FRAME_CSP,
 } from "./render.ts";
+import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
+
+const MERMAID_JS = createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js");
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { createMcpServer, type Deps } from "./mcp.ts";
 
@@ -38,6 +44,15 @@ function send(c: Context, body: string | Buffer, contentType: string) {
 export function createApp({ registry, store, config }: Deps): Hono {
   const app = new Hono();
   const base = () => baseUrlOf(config);
+
+  const artifactHasMermaid = (artifact: Artifact) =>
+    (artifact.kind === "markdown" || artifact.kind === "mdx") &&
+    hasMermaid(store.readSource(artifact.id, artifact.filename).toString("utf8"));
+  const shellSandbox = (artifact: Artifact) => {
+    const sb = sandboxFor(artifact);
+    if (sb.includes("allow-scripts") || !artifactHasMermaid(artifact)) return sb;
+    return `${sb} allow-scripts`;
+  };
 
   app.use("*", async (c, next) => {
     await next();
@@ -56,7 +71,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     if (!pub) return c.text("publication not found", 404);
     const artifact = registry.getArtifact(pub.latestArtifactId)!;
     c.header("Content-Security-Policy", SHELL_CSP);
-    return c.html(shellPage(pub, artifact, base()));
+    return c.html(shellPage(pub, artifact, base(), shellSandbox(artifact)));
   });
 
   app.get("/p/:slug/r/:artifactId", (c) => {
@@ -64,7 +79,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     const artifact = registry.getArtifact(c.req.param("artifactId"));
     if (!pub || !artifact || artifact.publicationId !== pub.id) return c.text("revision not found", 404);
     c.header("Content-Security-Policy", SHELL_CSP);
-    return c.html(shellPage(pub, artifact, base(), true));
+    return c.html(shellPage(pub, artifact, base(), shellSandbox(artifact), true));
   });
 
   app.get("/frame/:artifactId", async (c) => {
@@ -72,6 +87,12 @@ export function createApp({ registry, store, config }: Deps): Hono {
     if (!artifact) return c.text("artifact not found", 404);
     if (artifact.kind === "static-folder") return c.redirect(`/frame/${artifact.id}/`);
     const raw = store.readSource(artifact.id, artifact.filename);
+    if ((artifact.kind === "markdown" || artifact.kind === "mdx") && hasMermaid(raw.toString("utf8"))) {
+      const nonce = randomUUID();
+      const { body, contentType } = await renderMarkdown(raw.toString("utf8"), nonce);
+      c.header("Content-Security-Policy", mermaidCsp(nonce));
+      return send(c, body, contentType);
+    }
     const { body, contentType } = await renderArtifact(artifact, raw);
     c.header("Content-Security-Policy", cspFor(artifact));
     return send(c, body, contentType);
@@ -160,6 +181,11 @@ export function createApp({ registry, store, config }: Deps): Hono {
     if (!ids) return c.json({ error: "publication not found" }, 404);
     for (const id of ids) store.remove(id);
     return c.json({ deleted: c.req.param("slug"), revisions: ids.length });
+  });
+
+  app.get("/vendor/mermaid.js", (c) => {
+    c.header("Cache-Control", "public, max-age=86400");
+    return send(c, fs.readFileSync(MERMAID_JS), "text/javascript; charset=utf-8");
   });
 
   app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp" }));
@@ -382,7 +408,7 @@ function galleryPage(pubs: Publication[], q?: string): string {
   return page("serve-mcp · artifact shelf", body);
 }
 
-function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, isRevision = false): string {
+function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, sandbox: string, isRevision = false): string {
   const frameSrc =
     artifact.kind === "static-folder" ? `/frame/${artifact.id}/` : `/frame/${artifact.id}`;
   const revNote = isRevision
@@ -408,6 +434,6 @@ function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, isRevi
     <button class="btn" onclick="navigator.clipboard.writeText('${escapeHtml(baseUrl)}/p/${escapeHtml(pub.slug)}').then(()=>{this.textContent='Copied';setTimeout(()=>this.textContent='Copy URL',1200)})">Copy URL</button>
   </header>
   ${subBits.length ? `<div class="subbar">${subBits.join(" · ")}</div>` : ""}
-  <iframe class="preview" sandbox="${sandboxFor(artifact)}" src="${frameSrc}"></iframe>`;
+  <iframe class="preview" sandbox="${sandbox}" src="${frameSrc}"></iframe>`;
   return page(pub.title, body, 'class="shell"');
 }

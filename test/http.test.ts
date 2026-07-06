@@ -124,6 +124,41 @@ test("gallery cards: cover link opens publication, menu offers raw + delete; DEL
   cleanup();
 });
 
+test("mermaid markdown: nonce-gated scripts, injected scripts stay blocked", async () => {
+  const { store, registry, get, cleanup } = setup();
+  const md = "# D\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n<script>evil()</script>\n";
+  const ing = store.ingest({ type: "content", content: md, filename: "diagram.md" });
+  registry.publish({ ingested: ing, title: "Diagram", slug: "diagram", sourceType: "content" });
+
+  const frame = await get(`/frame/${ing.id}`);
+  const csp = frame.headers.get("content-security-policy")!;
+  const nonce = csp.match(/script-src 'nonce-([^']+)'/)?.[1];
+  assert.ok(nonce, "CSP must be nonce-based for mermaid frames");
+  const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"))!;
+  assert.doesNotMatch(scriptSrc, /unsafe-inline|'self'/, "script-src is nonce-only");
+  const html = await frame.text();
+  assert.match(html, /<pre class="mermaid">flowchart LR/);
+  assert.match(html, new RegExp(`<script nonce="${nonce}" src="/vendor/mermaid.js">`));
+  assert.match(html, /<script>evil\(\)<\/script>/, "injected tag present but has no nonce");
+
+  const shell = await (await get("/p/diagram")).text();
+  assert.match(shell, /sandbox="[^"]*allow-scripts[^"]*"/, "shell iframe allows scripts for mermaid");
+  assert.doesNotMatch(shell, /allow-same-origin/);
+
+  const vendor = await get("/vendor/mermaid.js");
+  assert.equal(vendor.status, 200);
+  assert.match(vendor.headers.get("content-type")!, /javascript/);
+
+  // markdown without mermaid keeps the locked-down frame
+  const plain = store.ingest({ type: "content", content: "# p", filename: "p.md" });
+  registry.publish({ ingested: plain, title: "Plain md", sourceType: "content" });
+  const plainFrame = await get(`/frame/${plain.id}`);
+  assert.match(plainFrame.headers.get("content-security-policy")!, /script-src 'none'/);
+  const plainShell = await (await get("/p/plain-md")).text();
+  assert.doesNotMatch(plainShell, /allow-scripts/);
+  cleanup();
+});
+
 test("markdown external links open in a new tab; internal links stay in-frame", async () => {
   const { store, registry, get, cleanup } = setup();
   const ing = store.ingest({
