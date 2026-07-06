@@ -93,6 +93,14 @@ export class Registry {
     `);
   }
 
+  private one<T>(sql: string, ...bind: (string | number | null)[]): T | undefined {
+    return this.db.prepare(sql).get(...bind) as T | undefined;
+  }
+
+  private many<T>(sql: string, ...bind: (string | number | null)[]): T[] {
+    return this.db.prepare(sql).all(...bind) as unknown as T[];
+  }
+
   publish(params: PublishParams): { publication: Publication; artifact: Artifact } {
     const { ingested, description, updateExisting = false, tags = [], renderer = {}, sourceType, sourceLabel } = params;
     const now = new Date().toISOString();
@@ -168,22 +176,24 @@ export class Registry {
   }
 
   getPublication(slugOrId: string): Publication | null {
-    const row = this.db
-      .prepare(`SELECT * FROM publications WHERE slug = ? OR id = ?`)
-      .get(slugOrId, slugOrId) as PublicationRow | undefined;
+    const row = this.one<PublicationRow>(
+      `SELECT * FROM publications WHERE slug = ? OR id = ?`,
+      slugOrId,
+      slugOrId
+    );
     return row ? this.pubFromRow(row) : null;
   }
 
   getArtifact(id: string): Artifact | null {
-    const row = this.db.prepare(`SELECT * FROM artifacts WHERE id = ?`).get(id) as ArtifactRow | undefined;
+    const row = this.one<ArtifactRow>(`SELECT * FROM artifacts WHERE id = ?`, id);
     return row ? artifactFromRow(row) : null;
   }
 
   private revisionIds(pubId: string): string[] {
-    const rows = this.db
-      .prepare(`SELECT id FROM artifacts WHERE publication_id = ? ORDER BY created_at ASC`)
-      .all(pubId) as { id: string }[];
-    return rows.map((r) => r.id);
+    return this.many<{ id: string }>(
+      `SELECT id FROM artifacts WHERE publication_id = ? ORDER BY created_at ASC`,
+      pubId
+    ).map((r) => r.id);
   }
 
   listPublications(params: ListParams = {}): { publications: Publication[]; nextCursor?: string } {
@@ -205,14 +215,15 @@ export class Registry {
       bind.push(...kind);
     }
 
-    const rows = this.db
-      .prepare(
-        `SELECT p.*, a.kind AS latest_kind FROM publications p
-         JOIN artifacts a ON a.id = p.latest_artifact_id
-         ${where.length ? "WHERE " + where.join(" AND ") : ""}
-         ORDER BY p.pinned DESC, ${col} ${dir} LIMIT ? OFFSET ?`
-      )
-      .all(...bind, limit + 1, offset) as unknown as PublicationRow[];
+    const rows = this.many<PublicationRow>(
+      `SELECT p.*, a.kind AS latest_kind FROM publications p
+       JOIN artifacts a ON a.id = p.latest_artifact_id
+       ${where.length ? "WHERE " + where.join(" AND ") : ""}
+       ORDER BY p.pinned DESC, ${col} ${dir} LIMIT ? OFFSET ?`,
+      ...bind,
+      limit + 1,
+      offset
+    );
 
     let out = rows.map((r) => this.pubFromRow(r));
     if (tags?.length) out = out.filter((p) => tags.every((t) => p.tags.includes(t)));

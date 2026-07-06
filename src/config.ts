@@ -30,6 +30,10 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   };
 }
 
+export function baseUrlOf(config: Config): string {
+  return config.baseUrl ?? "";
+}
+
 // 0.0.0.0/:: is bindable but not linkable; advertise a reachable address.
 export function advertiseHost(bindHost: string): string {
   if (bindHost !== "0.0.0.0" && bindHost !== "::") return bindHost;

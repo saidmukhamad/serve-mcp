@@ -2,8 +2,9 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mc
 import { z } from "zod";
 import { KINDS } from "./types.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
+import { baseUrlOf } from "./config.ts";
 import type { ArtifactStore } from "./store.ts";
-import type { Config, Source } from "./types.ts";
+import type { Config } from "./types.ts";
 
 const sourceSchema = z.discriminatedUnion("type", [
   z.object({
@@ -71,7 +72,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     { name: "serve-mcp", version: "0.1.0" },
     { capabilities: { resources: { listChanged: true } } }
   );
-  const base = () => config.baseUrl ?? "";
+  const base = () => baseUrlOf(config);
 
   mcp.registerTool(
     "artifact_publish",
@@ -85,7 +86,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     },
     async (input) => {
       const allowedRoots = process.env.SERVE_MCP_ALLOWED_ROOTS?.split(":").filter(Boolean);
-      const source = input.source as Source;
+      const source = input.source;
       let ingested;
       try {
         ingested = store.ingest(source, allowedRoots);
@@ -193,7 +194,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       const artifact = registry.getArtifact(pub.latestArtifactId)!;
       const compact = {
         ...publicationWithUrls(pub, base()),
-        rawUrl: `${base()}/raw/${artifact.id}`,
+        rawUrl: artifactWithUrls(artifact, base()).rawUrl,
         kind: artifact.kind,
       };
       return {

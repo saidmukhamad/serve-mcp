@@ -3,7 +3,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import fs from "node:fs";
 import path from "node:path";
 import { detectMime, FOLDER_INDEXES } from "./kinds.ts";
-import { advertiseHost } from "./config.ts";
+import { advertiseHost, baseUrlOf } from "./config.ts";
 import { isCgnat, resolveTailnetDnsName } from "./tailnet.ts";
 import { writeServerInfo } from "./server-info.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
@@ -22,13 +22,9 @@ import {
   FRAME_CSP,
 } from "./render.ts";
 import { StreamableHTTPTransport } from "@hono/mcp";
-import { createMcpServer } from "./mcp.ts";
+import { createMcpServer, type Deps } from "./mcp.ts";
 
-export interface Deps {
-  registry: Registry;
-  store: ArtifactStore;
-  config: Config;
-}
+export type { Deps };
 
 const SHELL_CSP =
   "default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-src 'self'; connect-src 'self'";
@@ -40,7 +36,7 @@ function send(c: Context, body: string | Buffer, contentType: string) {
 
 export function createApp({ registry, store, config }: Deps): Hono {
   const app = new Hono();
-  const base = () => config.baseUrl ?? "";
+  const base = () => baseUrlOf(config);
 
   app.use("*", async (c, next) => {
     await next();
