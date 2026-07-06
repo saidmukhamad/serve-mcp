@@ -61,6 +61,8 @@ export interface Config {
   dataDir: string;
   /** null until a server binds or an existing one is discovered. */
   baseUrl: string | null;
+  /** true when SERVE_MCP_BASE_URL (or an override) pinned the URL. */
+  baseUrlExplicit: boolean;
 }
 
 export interface Rendered {

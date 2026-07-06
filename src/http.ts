@@ -171,8 +171,8 @@ export function startHttp(deps: Deps): Promise<{ server: ServerType; baseUrl: st
       void (async () => {
         let host = advertiseHost(config.host);
         // A tailnet IP usually has a MagicDNS name — advertise that instead.
-        if (!config.baseUrl && isCgnat(host)) host = (await resolveTailnetDnsName(host)) ?? host;
-        const baseUrl = config.baseUrl ?? `http://${host}:${addr.port}`;
+        if (!config.baseUrlExplicit && isCgnat(host)) host = (await resolveTailnetDnsName(host)) ?? host;
+        const baseUrl = config.baseUrlExplicit ? config.baseUrl! : `http://${host}:${addr.port}`;
         config.baseUrl = baseUrl;
         writeServerInfo(config.dataDir, { baseUrl, host: config.host, port: addr.port });
         resolve({ server, baseUrl });

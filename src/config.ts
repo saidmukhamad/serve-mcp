@@ -26,6 +26,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     port,
     dataDir,
     baseUrl: explicit ?? (port ? `http://${advertiseHost(host)}:${port}` : null),
+    baseUrlExplicit: Boolean(explicit),
   };
 }
 
