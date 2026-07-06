@@ -213,11 +213,15 @@ const UI_CSS = `
   main.gallery { max-width: 60rem; margin: 0 auto; padding: 1.4rem 1.1rem 4rem; }
   form.search input { width: 100%; padding: 0.55rem 0.9rem; border-radius: 8px; font: inherit;
                       border: 1px solid light-dark(#d8d8e0, #33333c); background: light-dark(#fff, #17171c); color: inherit; }
-  .card { display: flex; align-items: center; gap: 0.8rem; padding: 0.85rem 1rem; margin-top: 0.7rem;
+  .card { display: flex; align-items: stretch; gap: 0.8rem; padding: 0.85rem 1rem; margin-top: 0.7rem;
           background: light-dark(#ffffff, #17171c); border: 1px solid light-dark(#e4e4ea, #26262e); border-radius: 10px; }
   .card .title { font-weight: 600; }
   .card .desc { font-size: 0.85rem; color: light-dark(#666670, #9a9aa4); }
+  .card .side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;
+                gap: 0.45rem; margin-left: auto; flex-shrink: 0; }
+  .card .actions { display: flex; align-items: center; gap: 0.8rem; }
   .tag { font-size: 0.72rem; color: light-dark(#0b62d6, #7ab8ff); }
+  .branch { color: light-dark(#2da44e, #57d364); }
   h2.section { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em;
                color: light-dark(#8a8a94, #77777f); margin: 1.6rem 0 0.2rem; }
   body.shell { display: flex; flex-direction: column; height: 100vh; }
@@ -226,8 +230,8 @@ const UI_CSS = `
   .subbar { display: flex; flex-wrap: wrap; gap: 0.6rem; padding: 0.4rem 1.1rem; font-size: 0.82rem;
             color: light-dark(#777782, #8b8b96); background: light-dark(#ffffff, #17171c);
             border-bottom: 1px solid light-dark(#e4e4ea, #26262e); }
-  .subbar code { background: light-dark(#f0f0f3, #26262e); padding: 0.05em 0.35em; border-radius: 4px;
-                 font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; }
+  code { background: light-dark(#f0f0f3, #26262e); padding: 0.05em 0.35em; border-radius: 4px;
+         font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; }
   .prov { font-size: 0.78rem; color: light-dark(#8a8a94, #77777f); }
   .empty { text-align: center; padding: 4rem 0; }
 `;
@@ -250,16 +254,24 @@ function shortRemote(url: string): string {
     .replace(/\.git$/, "");
 }
 
+// fish-prompt style: ~/code/serve-mcp/ (main) · github.com/user/repo
 function provenanceBits(context: SourceContext | undefined): string[] {
   if (!context) return [];
   const bits: string[] = [];
-  const from = context.path ?? context.cwd;
-  if (from) bits.push(`from <code>${escapeHtml(tildify(from))}</code>`);
+  const raw = context.path ?? context.cwd;
+  const branch = context.git?.branch
+    ? ` <span class="branch">(${escapeHtml(context.git.branch)})</span>`
+    : "";
+  if (raw) {
+    const isFile = /\.[^/.]+$/.test(path.basename(raw));
+    const dir = tildify(isFile ? path.dirname(raw) : raw).replace(/\/?$/, "/");
+    bits.push(`<code>${escapeHtml(dir)}</code>${branch}`);
+  } else if (branch) {
+    bits.push(branch.trim());
+  }
   if (context.git?.remote) {
-    const branch = context.git.branch ? ` @ ${escapeHtml(context.git.branch)}` : "";
-    bits.push(`<code>${escapeHtml(shortRemote(context.git.remote))}</code>${branch}`);
-  } else if (context.git?.branch) {
-    bits.push(`branch <code>${escapeHtml(context.git.branch)}</code>`);
+    const short = shortRemote(context.git.remote);
+    bits.push(`<a href="https://${escapeHtml(short)}" target="_blank" rel="noopener">${escapeHtml(short)}</a>`);
   }
   return bits;
 }
@@ -299,13 +311,16 @@ function galleryPage(pubs: Publication[], q?: string): string {
         <a class="title" href="/p/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a>
         ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ""}
         ${provenanceBits(p.context).length ? `<div class="prov">${provenanceBits(p.context).join(" · ")}</div>` : ""}
-        <div class="muted">${p.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join(" ")}</div>
       </div>
-      <div class="spacer"></div>
-      <span class="badge">${escapeHtml(p.kind ?? "")}</span>
-      <span class="muted">${p.revisions.length} rev · ${relTime(p.updatedAt)}</span>
-      <a class="btn" href="/p/${escapeHtml(p.slug)}">Open</a>
-      <a class="btn" href="/raw/${escapeHtml(p.latestArtifactId)}">Raw</a>
+      <div class="side">
+        <div class="tags">${p.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join(" ")}</div>
+        <div class="actions">
+          <span class="badge">${escapeHtml(p.kind ?? "")}</span>
+          <span class="muted">${p.revisions.length} rev · ${relTime(p.updatedAt)}</span>
+          <a class="btn" href="/p/${escapeHtml(p.slug)}">Open</a>
+          <a class="btn" href="/raw/${escapeHtml(p.latestArtifactId)}">Raw</a>
+        </div>
+      </div>
     </div>`;
   const section = (label: string, items: Publication[]) =>
     items.length ? `<h2 class="section">${label}</h2>${items.map(card).join("\n")}` : "";

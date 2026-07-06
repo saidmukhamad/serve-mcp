@@ -89,8 +89,8 @@ test("shell and gallery show description and git provenance", async () => {
 
   const shell = await (await get("/p/prov-report")).text();
   assert.match(shell, /Weekly numbers/);
-  assert.match(shell, /from <code>\/home\/dev\/proj\/report\.md<\/code>/);
-  assert.match(shell, /github\.com\/acme\/widgets<\/code> @ main/);
+  assert.match(shell, /<code>\/home\/dev\/proj\/<\/code> <span class="branch">\(main\)<\/span>/, "fish-style dir (branch)");
+  assert.match(shell, /<a href="https:\/\/github\.com\/acme\/widgets" target="_blank" rel="noopener">github\.com\/acme\/widgets<\/a>/);
 
   const gallery = await (await get("/")).text();
   assert.match(gallery, /Weekly numbers/);
