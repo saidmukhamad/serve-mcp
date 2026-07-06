@@ -27,7 +27,9 @@ test("gallery, shell, frame, raw, api", async () => {
 
   const shell = await get("/p/the-report");
   assert.equal(shell.status, 200);
-  assert.match(await shell.text(), /sandbox=""/, "iframe must be sandboxed with no scripts");
+  const shellHtml = await shell.text();
+  assert.match(shellHtml, /sandbox="[^"]*"/, "iframe must be sandboxed");
+  assert.doesNotMatch(shellHtml, /allow-scripts/, "no scripts without opt-in");
   assert.ok(shell.headers.get("content-security-policy"));
 
   const frame = await get(`/frame/${ing.id}`);
@@ -66,7 +68,21 @@ test("html artifact served in no-script frame; allowScripts loosens sandbox", as
   const frame2 = await get(`/frame/${ing2.id}`);
   assert.doesNotMatch(frame2.headers.get("content-security-policy")!, /script-src 'none'/);
   const shell2 = await get("/p/app");
-  assert.match(await shell2.text(), /sandbox="allow-scripts"/);
+  assert.match(await shell2.text(), /sandbox="[^"]*allow-scripts[^"]*"/);
+  cleanup();
+});
+
+test("markdown external links open in a new tab; internal links stay in-frame", async () => {
+  const { store, registry, get, cleanup } = setup();
+  const ing = store.ingest({
+    type: "content",
+    content: "[docs](https://tailscale.com/kb) and [local](other.md)",
+    filename: "links.md",
+  });
+  registry.publish({ ingested: ing, title: "Links", sourceType: "content" });
+  const html = await (await get(`/frame/${ing.id}`)).text();
+  assert.match(html, /<a href="https:\/\/tailscale\.com\/kb" target="_blank" rel="noopener">/);
+  assert.match(html, /<a href="other\.md">/);
   cleanup();
 });
 
@@ -123,6 +139,15 @@ test("folder navigation: per-dir indexes, dir redirect, ../ listing links", asyn
 
   const asset = await get(`/frame/${ing.id}/assets/chart.csv`);
   assert.equal(asset.status, 200, "../assets/chart.csv from guides/setup.md resolves");
+  assert.match(asset.headers.get("content-type")!, /text\/html/, "csv renders as a view");
+  const assetHtml = await asset.text();
+  assert.match(assetHtml, /<table>/);
+  assert.match(assetHtml, /href="\?raw"/, "rendered view links to the raw file");
+
+  const rawAsset = await get(`/frame/${ing.id}/assets/chart.csv?raw`);
+  assert.match(rawAsset.headers.get("content-type")!, /text\/csv/, "?raw serves the actual file");
+  assert.match(rawAsset.headers.get("content-disposition")!, /attachment/);
+  assert.match(await rawAsset.text(), /x,y/);
 
   const listing = await get(`/frame/${ing.id}/assets/`);
   assert.equal(listing.status, 200);

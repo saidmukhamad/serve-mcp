@@ -12,6 +12,8 @@ import type { Artifact, Config, Publication } from "./types.ts";
 import {
   renderArtifact,
   renderMarkdown,
+  renderCsv,
+  renderJson,
   cspFor,
   sandboxFor,
   escapeHtml,
@@ -100,12 +102,27 @@ export function createApp({ registry, store, config }: Deps): Hono {
   });
 
   async function serveFolderFile(c: Context, abs: string) {
-    if (/\.(md|markdown)$/i.test(abs)) {
-      const { body, contentType } = await renderMarkdown(fs.readFileSync(abs, "utf8"));
-      c.header("Content-Type", contentType);
-      return c.body(body as unknown as ArrayBuffer);
+    const name = path.basename(abs);
+    const wantsRaw = c.req.query("raw") !== undefined;
+    const rendered = wantsRaw
+      ? null
+      : /\.(md|markdown)$/i.test(name)
+        ? await renderMarkdown(fs.readFileSync(abs, "utf8"))
+        : /\.csv$/i.test(name)
+          ? renderCsv(fs.readFileSync(abs, "utf8"), name)
+          : /\.json$/i.test(name)
+            ? renderJson(fs.readFileSync(abs, "utf8"), name)
+            : null;
+    if (rendered) {
+      const withRawLink = String(rendered.body).replace(
+        "</body>",
+        `<p class="muted" style="text-align:center"><a href="?raw" download>download ${escapeHtml(name)}</a></p></body>`
+      );
+      c.header("Content-Type", rendered.contentType);
+      return c.body(withRawLink as unknown as ArrayBuffer);
     }
-    c.header("Content-Type", detectMime(path.basename(abs)));
+    c.header("Content-Type", detectMime(name));
+    if (wantsRaw) c.header("Content-Disposition", `attachment; filename="${name.replace(/[^\w.\-]/g, "_")}"`);
     return c.body(fs.readFileSync(abs) as unknown as ArrayBuffer);
   }
 

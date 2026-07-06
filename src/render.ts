@@ -21,8 +21,12 @@ export function cspFor(artifact: RendererCarrier): string {
   return allowsScripts(artifact) ? FRAME_CSP_SCRIPTS : FRAME_CSP;
 }
 
+// Popups escape the sandbox so external links can open in a real tab
+// (framed navigation is refused by most sites); scripts stay opt-in.
+const SANDBOX_BASE = "allow-downloads allow-popups allow-popups-to-escape-sandbox";
+
 export function sandboxFor(artifact: RendererCarrier): string {
-  return allowsScripts(artifact) ? "allow-scripts" : "";
+  return allowsScripts(artifact) ? `${SANDBOX_BASE} allow-scripts` : SANDBOX_BASE;
 }
 
 export async function renderArtifact(artifact: Artifact, raw: Buffer): Promise<Rendered> {
@@ -55,10 +59,14 @@ export async function renderArtifact(artifact: Artifact, raw: Buffer): Promise<R
 
 export async function renderMarkdown(md: string): Promise<Rendered> {
   const { html } = await markdownToHtml(md, { features: { gfm: true, frontmatter: true } });
-  return docShell("", `<article class="prose">${html}</article>`);
+  return docShell("", `<article class="prose">${externalLinksInNewTab(html)}</article>`);
 }
 
-function renderJson(text: string, title: string): Rendered {
+function externalLinksInNewTab(html: string): string {
+  return html.replace(/<a href="(https?:\/\/[^"]+)">/g, '<a href="$1" target="_blank" rel="noopener">');
+}
+
+export function renderJson(text: string, title: string): Rendered {
   let pretty: string;
   try {
     pretty = JSON.stringify(JSON.parse(text), null, 2);
@@ -68,7 +76,7 @@ function renderJson(text: string, title: string): Rendered {
   return docShell(title, `<pre>${escapeHtml(pretty)}</pre>`);
 }
 
-function renderCsv(text: string, title: string): Rendered {
+export function renderCsv(text: string, title: string): Rendered {
   const rows = parseCsv(text);
   if (rows.length === 0) return docShell(title, `<p class="muted">Empty CSV</p>`);
   const [head, ...body] = rows;
