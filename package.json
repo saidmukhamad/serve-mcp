@@ -13,19 +13,22 @@
   "author": "saidmukhamad",
   "type": "module",
   "bin": {
-    "serve-mcp": "bin/serve-mcp.js"
+    "serve-mcp": "dist/bin/serve-mcp.js"
   },
   "files": [
-    "bin",
-    "src"
+    "dist/bin",
+    "dist/src"
   ],
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
-    "start": "node bin/serve-mcp.js serve",
-    "mcp": "node bin/serve-mcp.js mcp",
-    "test": "node --test \"test/*.test.js\""
+    "start": "node bin/serve-mcp.ts serve",
+    "mcp": "node bin/serve-mcp.ts mcp",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run typecheck && node --test \"test/*.test.ts\"",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
@@ -33,5 +36,9 @@
     "hono": "^4.7.0",
     "satteri": "^0.9.4",
     "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^5.9.3"
   }
 }
