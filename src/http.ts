@@ -3,6 +3,8 @@ import { serve, type ServerType } from "@hono/node-server";
 import fs from "node:fs";
 import path from "node:path";
 import { detectMime, FOLDER_INDEXES } from "./kinds.ts";
+import { advertiseHost } from "./config.ts";
+import { writeServerInfo } from "./server-info.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
 import type { ArtifactStore } from "./store.ts";
 import type { Artifact, Config, Publication } from "./types.ts";
@@ -27,6 +29,7 @@ const SHELL_CSP =
 
 export function createApp({ registry, store, config }: Deps): Hono {
   const app = new Hono();
+  const base = () => config.baseUrl ?? "";
 
   app.use("*", async (c, next) => {
     await next();
@@ -45,7 +48,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     if (!pub) return c.text("publication not found", 404);
     const artifact = registry.getArtifact(pub.latestArtifactId)!;
     c.header("Content-Security-Policy", SHELL_CSP);
-    return c.html(shellPage(pub, artifact, config.baseUrl));
+    return c.html(shellPage(pub, artifact, base()));
   });
 
   app.get("/p/:slug/r/:artifactId", (c) => {
@@ -53,7 +56,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     const artifact = registry.getArtifact(c.req.param("artifactId"));
     if (!pub || !artifact || artifact.publicationId !== pub.id) return c.text("revision not found", 404);
     c.header("Content-Security-Policy", SHELL_CSP);
-    return c.html(shellPage(pub, artifact, config.baseUrl, true));
+    return c.html(shellPage(pub, artifact, base(), true));
   });
 
   app.get("/frame/:artifactId", async (c) => {
@@ -119,7 +122,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
   app.get("/meta/:artifactId", (c) => {
     const artifact = registry.getArtifact(c.req.param("artifactId"));
     if (!artifact) return c.json({ error: "artifact not found" }, 404);
-    return c.json(artifactWithUrls(artifact, config.baseUrl));
+    return c.json(artifactWithUrls(artifact, base()));
   });
 
   app.get("/api/publications", (c) => {
@@ -129,7 +132,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
       cursor: c.req.query("cursor") || undefined,
     });
     return c.json({
-      publications: publications.map((p) => publicationWithUrls(p, config.baseUrl)),
+      publications: publications.map((p) => publicationWithUrls(p, base())),
       nextCursor,
     });
   });
@@ -137,7 +140,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
   app.get("/api/artifacts/:id", (c) => {
     const artifact = registry.getArtifact(c.req.param("id"));
     if (!artifact) return c.json({ error: "artifact not found" }, 404);
-    return c.json(artifactWithUrls(artifact, config.baseUrl));
+    return c.json(artifactWithUrls(artifact, base()));
   });
 
   app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp" }));
@@ -145,14 +148,18 @@ export function createApp({ registry, store, config }: Deps): Hono {
   return app;
 }
 
-// Resolves to null when the port is taken: another serve-mcp process is
-// already serving the shared shelf, so callers just use its URL.
-export function startHttp(deps: Deps): Promise<ServerType | null> {
+// Binds config.port, or an ephemeral port when null. Resolves to null only
+// when an explicit port is taken — another serve-mcp is serving the shelf.
+export function startHttp(deps: Deps): Promise<{ server: ServerType; baseUrl: string } | null> {
+  const { config } = deps;
   const app = createApp(deps);
   return new Promise((resolve, reject) => {
-    const server = serve({ fetch: app.fetch, hostname: deps.config.host, port: deps.config.port }, () =>
-      resolve(server)
-    );
+    const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port ?? 0 }, (addr) => {
+      const baseUrl = config.baseUrl ?? `http://${advertiseHost(config.host)}:${addr.port}`;
+      config.baseUrl = baseUrl;
+      writeServerInfo(config.dataDir, { baseUrl, host: config.host, port: addr.port });
+      resolve({ server, baseUrl });
+    });
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") resolve(null);
       else reject(err);

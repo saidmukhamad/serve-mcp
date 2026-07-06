@@ -71,7 +71,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     { name: "serve-mcp", version: "0.1.0" },
     { capabilities: { resources: { listChanged: true } } }
   );
-  const base = config.baseUrl;
+  const base = () => config.baseUrl ?? "";
 
   mcp.registerTool(
     "artifact_publish",
@@ -107,8 +107,8 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       } catch (err) {
         return errorResult((err as Error).message);
       }
-      const publication = publicationWithUrls(result.publication, base);
-      const artifact = artifactWithUrls(result.artifact, base);
+      const publication = publicationWithUrls(result.publication, base());
+      const artifact = artifactWithUrls(result.artifact, base());
       return {
         content: [
           { type: "text" as const, text: `Published: ${publication.previewUrl}` },
@@ -146,7 +146,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     },
     async (input) => {
       const { publications, nextCursor } = registry.listPublications(input);
-      const decorated = publications.map((p) => publicationWithUrls(p, base));
+      const decorated = publications.map((p) => publicationWithUrls(p, base()));
       const lines =
         decorated.length === 0
           ? ["(shelf is empty)"]
@@ -173,7 +173,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
           {
             uri: uri.href,
             mimeType: "application/json",
-            text: JSON.stringify(publications.map((p) => publicationWithUrls(p, base)), null, 2),
+            text: JSON.stringify(publications.map((p) => publicationWithUrls(p, base())), null, 2),
           },
         ],
       };
@@ -202,8 +202,8 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       if (!pub) throw new Error(`publication not found: ${slug}`);
       const artifact = registry.getArtifact(pub.latestArtifactId)!;
       const compact = {
-        ...publicationWithUrls(pub, base),
-        rawUrl: `${base}/raw/${artifact.id}`,
+        ...publicationWithUrls(pub, base()),
+        rawUrl: `${base()}/raw/${artifact.id}`,
         kind: artifact.kind,
       };
       return {

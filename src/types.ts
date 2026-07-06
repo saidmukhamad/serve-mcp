@@ -56,9 +56,11 @@ export interface Publication {
 
 export interface Config {
   host: string;
-  port: number;
+  /** null = ephemeral: the OS assigns a free port at bind time. */
+  port: number | null;
   dataDir: string;
-  baseUrl: string;
+  /** null until a server binds or an existing one is discovered. */
+  baseUrl: string | null;
 }
 
 export interface Rendered {
