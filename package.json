@@ -1,0 +1,37 @@
+{
+  "name": "serve-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP-controlled artifact shelf: agents publish HTML, Markdown, folders and files; humans get nice preview URLs.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "artifacts",
+    "preview",
+    "agents"
+  ],
+  "license": "MIT",
+  "author": "saidmukhamad",
+  "type": "module",
+  "bin": {
+    "serve-mcp": "bin/serve-mcp.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node bin/serve-mcp.js serve",
+    "mcp": "node bin/serve-mcp.js mcp",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "hono": "^4.7.0",
+    "satteri": "^0.9.4",
+    "zod": "^3.24.0"
+  }
+}
