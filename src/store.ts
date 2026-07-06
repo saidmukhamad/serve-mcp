@@ -41,16 +41,7 @@ export class ArtifactStore {
     { content, filename, mimeType }: Extract<Source, { type: "content" }>
   ): Ingested {
     const name = sanitizeFilename(filename ?? "content.txt");
-    const buf = Buffer.from(content, "utf8");
-    fs.writeFileSync(path.join(dir, name), buf);
-    return {
-      id,
-      kind: detectKind(name),
-      mimeType: mimeType ?? detectMime(name, "text/plain"),
-      sha256: sha256(buf),
-      filename: name,
-      sizeBytes: buf.length,
-    };
+    return this.ingestFile(id, dir, name, Buffer.from(content, "utf8"), mimeType ?? detectMime(name, "text/plain"));
   }
 
   private ingestPath(
@@ -64,12 +55,15 @@ export class ArtifactStore {
       return this.ingestFolder(id, dir, { type: "folder", path: source.path }, allowedRoots);
     }
     const name = sanitizeFilename(path.basename(abs));
-    fs.copyFileSync(abs, path.join(dir, name));
-    const buf = fs.readFileSync(path.join(dir, name));
+    return this.ingestFile(id, dir, name, fs.readFileSync(abs), detectMime(name));
+  }
+
+  private ingestFile(id: string, dir: string, name: string, buf: Buffer, mimeType: string): Ingested {
+    fs.writeFileSync(path.join(dir, name), buf);
     return {
       id,
       kind: detectKind(name),
-      mimeType: detectMime(name),
+      mimeType,
       sha256: sha256(buf),
       filename: name,
       sizeBytes: buf.length,
@@ -104,7 +98,7 @@ export class ArtifactStore {
   sourcePath(artifactId: string, filename: string): string {
     const dir = this.dirFor(artifactId);
     const abs = path.resolve(dir, filename);
-    if (!abs.startsWith(dir + path.sep)) throw new Error("path escapes artifact dir");
+    if (!within(dir, abs)) throw new Error("path escapes artifact dir");
     return abs;
   }
 
@@ -115,7 +109,7 @@ export class ArtifactStore {
   statFolderPath(artifactId: string, relPath: string): { abs: string; type: "file" | "dir" } | null {
     const base = path.join(this.dirFor(artifactId), "files");
     const abs = path.resolve(base, relPath);
-    if (abs !== base && !abs.startsWith(base + path.sep)) return null;
+    if (!within(base, abs, true)) return null;
     if (!fs.existsSync(abs)) return null;
     return { abs, type: fs.statSync(abs).isDirectory() ? "dir" : "file" };
   }
@@ -154,10 +148,15 @@ export function resolveWithinRoots(p: string, allowedRoots?: string[]): string {
   return abs;
 }
 
+// The path-containment invariant every escape check goes through.
+function within(base: string, abs: string, allowSelf = false): boolean {
+  return (allowSelf && abs === base) || abs.startsWith(base + path.sep);
+}
+
 function pickEntrypoint(filesDir: string, requested?: string): string | null {
   if (requested) {
     const abs = path.resolve(filesDir, requested);
-    if (!abs.startsWith(filesDir + path.sep)) throw new Error("entrypoint escapes folder");
+    if (!within(filesDir, abs)) throw new Error("entrypoint escapes folder");
     if (!fs.existsSync(abs)) throw new Error(`entrypoint not found: ${requested}`);
     return requested;
   }
