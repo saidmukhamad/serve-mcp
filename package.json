@@ -25,7 +25,7 @@
   "scripts": {
     "start": "node bin/serve-mcp.js serve",
     "mcp": "node bin/serve-mcp.js mcp",
-    "test": "node --test test/"
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
