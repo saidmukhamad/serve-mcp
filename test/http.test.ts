@@ -8,7 +8,7 @@ import { makeDeps } from "./helpers.ts";
 function setup() {
   const deps = makeDeps();
   const app = createApp(deps);
-  const get = (p: string) => app.request(p);
+  const get = (p: string, method = "GET") => app.request(p, { method });
   return { ...deps, get };
 }
 
@@ -95,6 +95,32 @@ test("shell and gallery show description and git provenance", async () => {
   const gallery = await (await get("/")).text();
   assert.match(gallery, /Weekly numbers/);
   assert.match(gallery, /github\.com\/acme\/widgets/);
+  cleanup();
+});
+
+test("gallery cards: cover link opens publication, menu offers raw + delete; DELETE removes everything", async () => {
+  const { store, registry, get, cleanup } = setup();
+  const ing = store.ingest({ type: "content", content: "# bye", filename: "bye.md" });
+  registry.publish({ ingested: ing, title: "Bye", slug: "bye", sourceType: "content" });
+
+  const gallery = await (await get("/")).text();
+  assert.match(gallery, /<a class="cover" href="\/p\/bye"/);
+  assert.match(gallery, /<details class="menu">/);
+  assert.match(gallery, new RegExp(`href="/raw/${ing.id}"`));
+  assert.match(gallery, /data-del="bye"/);
+
+  const artifactDir = store.dirFor(ing.id);
+  const fs = await import("node:fs");
+  assert.ok(fs.existsSync(artifactDir));
+
+  const del = await get("/api/publications/bye", "DELETE");
+  assert.equal(del.status, 200);
+  assert.equal(((await del.json()) as { revisions: number }).revisions, 1);
+  assert.equal((await get("/p/bye")).status, 404);
+  assert.equal((await get(`/frame/${ing.id}`)).status, 404);
+  assert.equal(fs.existsSync(artifactDir), false, "artifact files removed from store");
+
+  assert.equal((await get("/api/publications/nope", "DELETE")).status, 404);
   cleanup();
 });
 

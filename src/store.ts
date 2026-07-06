@@ -114,6 +114,10 @@ export class ArtifactStore {
     return { abs, type: fs.statSync(abs).isDirectory() ? "dir" : "file" };
   }
 
+  remove(artifactId: string): void {
+    fs.rmSync(this.dirFor(artifactId), { recursive: true, force: true });
+  }
+
   listFolder(artifactId: string, relPath: string): { name: string; isDir: boolean; sizeBytes: number }[] {
     const entry = this.statFolderPath(artifactId, relPath);
     if (entry?.type !== "dir") return [];

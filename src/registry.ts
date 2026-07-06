@@ -262,6 +262,15 @@ export class Registry {
     };
   }
 
+  /** Removes the publication and all its revisions; returns deleted artifact ids. */
+  deletePublication(slugOrId: string): string[] | null {
+    const pub = this.getPublication(slugOrId);
+    if (!pub) return null;
+    this.db.prepare(`DELETE FROM artifacts WHERE publication_id = ?`).run(pub.id);
+    this.db.prepare(`DELETE FROM publications WHERE id = ?`).run(pub.id);
+    return pub.revisions;
+  }
+
   close(): void {
     this.db.close();
   }

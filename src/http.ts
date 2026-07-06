@@ -155,6 +155,13 @@ export function createApp({ registry, store, config }: Deps): Hono {
     });
   });
 
+  app.delete("/api/publications/:slug", (c) => {
+    const ids = registry.deletePublication(c.req.param("slug"));
+    if (!ids) return c.json({ error: "publication not found" }, 404);
+    for (const id of ids) store.remove(id);
+    return c.json({ deleted: c.req.param("slug"), revisions: ids.length });
+  });
+
   app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp" }));
 
   // MCP over HTTP: lets other machines add this shelf as an MCP server
@@ -213,15 +220,32 @@ const UI_CSS = `
   main.gallery { max-width: 60rem; margin: 0 auto; padding: 1.4rem 1.1rem 4rem; }
   form.search input { width: 100%; padding: 0.55rem 0.9rem; border-radius: 8px; font: inherit;
                       border: 1px solid light-dark(#d8d8e0, #33333c); background: light-dark(#fff, #17171c); color: inherit; }
-  .card { display: flex; align-items: stretch; gap: 0.8rem; padding: 0.85rem 1rem; margin-top: 0.7rem;
-          background: light-dark(#ffffff, #17171c); border: 1px solid light-dark(#e4e4ea, #26262e); border-radius: 10px; }
-  .card .title { font-weight: 600; }
+  .card { position: relative; display: flex; align-items: center; gap: 0.8rem; padding: 0.85rem 1rem;
+          margin-top: 0.7rem; background: light-dark(#ffffff, #17171c);
+          border: 1px solid light-dark(#e4e4ea, #26262e); border-radius: 10px; }
+  .card:hover { border-color: light-dark(#0b62d6, #7ab8ff); }
+  .card a.cover { position: absolute; inset: 0; z-index: 1; border-radius: 10px; }
+  .card .title { font-weight: 600; color: light-dark(#0b62d6, #7ab8ff); }
   .card .desc { font-size: 0.85rem; color: light-dark(#666670, #9a9aa4); }
-  .card .side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;
-                gap: 0.45rem; margin-left: auto; flex-shrink: 0; }
-  .card .actions { display: flex; align-items: center; gap: 0.8rem; }
-  .tag { font-size: 0.72rem; color: light-dark(#0b62d6, #7ab8ff); }
+  .card .side { position: relative; z-index: 2; display: flex; align-items: center; gap: 0.8rem;
+                margin-left: auto; flex-shrink: 0; }
+  .card .prov { position: relative; z-index: 2; width: fit-content; }
+  .tag { font-size: 0.78rem; color: light-dark(#0b62d6, #7ab8ff); }
   .branch { color: light-dark(#2da44e, #57d364); }
+  details.menu { position: relative; }
+  details.menu summary { list-style: none; cursor: pointer; padding: 0.1rem 0.6rem; border-radius: 6px;
+                         border: 1px solid light-dark(#d8d8e0, #33333c); background: light-dark(#fff, #1d1d23);
+                         font-size: 0.95rem; line-height: 1.4; }
+  details.menu summary::-webkit-details-marker { display: none; }
+  details.menu[open] summary { border-color: light-dark(#0b62d6, #7ab8ff); }
+  .menu-items { position: absolute; right: 0; top: calc(100% + 4px); min-width: 7rem; z-index: 3;
+                display: flex; flex-direction: column; overflow: hidden;
+                background: light-dark(#ffffff, #1d1d23); border: 1px solid light-dark(#d8d8e0, #33333c);
+                border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+  .menu-items a, .menu-items button { padding: 0.45rem 0.85rem; text-align: left; background: none;
+                                      border: 0; font: inherit; color: inherit; cursor: pointer; }
+  .menu-items a:hover, .menu-items button:hover { background: light-dark(#f2f2f6, #26262e); }
+  .menu-items .danger { color: light-dark(#c93c3c, #ff7a7a); }
   h2.section { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em;
                color: light-dark(#8a8a94, #77777f); margin: 1.6rem 0 0.2rem; }
   body.shell { display: flex; flex-direction: column; height: 100vh; }
@@ -305,23 +329,34 @@ function listingHtml(rel: string, entries: { name: string; isDir: boolean; sizeB
 function galleryPage(pubs: Publication[], q?: string): string {
   const pinned = pubs.filter((p) => p.pinned);
   const rest = pubs.filter((p) => !p.pinned);
-  const card = (p: Publication) => `
+  const card = (p: Publication) => {
+    const meta = [
+      ...provenanceBits(p.context),
+      p.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join(" "),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return `
     <div class="card">
+      <a class="cover" href="/p/${escapeHtml(p.slug)}" aria-label="Open ${escapeHtml(p.title)}"></a>
       <div style="min-width:0">
-        <a class="title" href="/p/${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a>
+        <span class="title">${escapeHtml(p.title)}</span>
         ${p.description ? `<div class="desc">${escapeHtml(p.description)}</div>` : ""}
-        ${provenanceBits(p.context).length ? `<div class="prov">${provenanceBits(p.context).join(" · ")}</div>` : ""}
+        ${meta ? `<div class="prov">${meta}</div>` : ""}
       </div>
       <div class="side">
-        <div class="tags">${p.tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join(" ")}</div>
-        <div class="actions">
-          <span class="badge">${escapeHtml(p.kind ?? "")}</span>
-          <span class="muted">${p.revisions.length} rev · ${relTime(p.updatedAt)}</span>
-          <a class="btn" href="/p/${escapeHtml(p.slug)}">Open</a>
-          <a class="btn" href="/raw/${escapeHtml(p.latestArtifactId)}">Raw</a>
-        </div>
+        <span class="badge">${escapeHtml(p.kind ?? "")}</span>
+        <span class="muted">${p.revisions.length} rev · ${relTime(p.updatedAt)}</span>
+        <details class="menu">
+          <summary aria-label="More actions">⋯</summary>
+          <div class="menu-items">
+            <a href="/raw/${escapeHtml(p.latestArtifactId)}">Raw</a>
+            <button class="danger" data-del="${escapeHtml(p.slug)}">Delete</button>
+          </div>
+        </details>
       </div>
     </div>`;
+  };
   const section = (label: string, items: Publication[]) =>
     items.length ? `<h2 class="section">${label}</h2>${items.map(card).join("\n")}` : "";
   const body = `
@@ -331,7 +366,19 @@ function galleryPage(pubs: Publication[], q?: string): string {
     <form class="search" method="get" action="/"><input name="q" placeholder="Search artifacts…" value="${escapeHtml(q ?? "")}"></form>
     ${pubs.length === 0 ? `<div class="empty muted">Nothing published yet. Agents publish with the <code>artifact_publish</code> MCP tool.</div>` : ""}
     ${pinned.length ? section("Pinned", pinned) + section("Recent", rest) : rest.map(card).join("\n")}
-  </main>`;
+  </main>
+  <script>
+    document.addEventListener("click", (e) => {
+      for (const d of document.querySelectorAll("details.menu[open]")) {
+        if (!d.contains(e.target)) d.removeAttribute("open");
+      }
+      const b = e.target.closest("[data-del]");
+      if (b && confirm('Delete "' + b.dataset.del + '" and all its revisions?')) {
+        fetch("/api/publications/" + b.dataset.del, { method: "DELETE" })
+          .then((r) => (r.ok ? location.reload() : alert("delete failed")));
+      }
+    });
+  </script>`;
   return page("serve-mcp · artifact shelf", body);
 }
 
