@@ -61,10 +61,12 @@ Filter by `query`, `tags`, `kind`; paginate with `cursor`; order by `createdAt|u
 ### Resources
 
 ```txt
-registry://publications   JSON list of everything on the shelf
-publication://<slug>      compact JSON (preview/raw URLs, latest revision)
-artifact://<id>           raw source of a revision
+registry://publications   JSON list of everything on the shelf (the only listed resource)
+publication://<slug>      compact JSON (preview/raw URLs, latest revision) — read-only, not enumerated
+artifact://<id>           raw source of a revision — read-only, not enumerated
 ```
+
+Only `registry://publications` shows up in `resources/list`, so host UIs stay clean however many publications exist; the `publication://` and `artifact://` URIs resolve when read directly (tool results include them as resource links).
 
 ## Human-facing API
 

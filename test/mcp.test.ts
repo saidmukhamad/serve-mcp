@@ -64,8 +64,7 @@ test("artifact_publish + artifact_list + resources round trip", async () => {
 
   const resources = await client.listResources();
   const uris = resources.resources.map((r) => r.uri);
-  assert.ok(uris.includes("registry://publications"));
-  assert.ok(uris.includes("publication://a-note"));
+  assert.deepEqual(uris, ["registry://publications"], "only the registry is enumerated");
 
   const read = await client.readResource({ uri: "publication://a-note" });
   const doc = JSON.parse((read.contents[0] as { text: string }).text);

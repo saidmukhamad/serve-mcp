@@ -181,22 +181,11 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     }
   );
 
+  // Not enumerated in resources/list — one registry:// entry beats N noisy
+  // per-publication entries in host UIs; direct reads still resolve.
   mcp.registerResource(
     "publication",
-    new ResourceTemplate("publication://{slug}", {
-      list: async () => {
-        const { publications } = registry.listPublications({ limit: 200 });
-        return {
-          resources: publications.map((p) => ({
-            uri: `publication://${p.slug}`,
-            name: p.slug,
-            title: p.title,
-            description: p.description,
-            mimeType: "application/json",
-          })),
-        };
-      },
-    }),
+    new ResourceTemplate("publication://{slug}", { list: undefined }),
     { title: "Publication", description: "Compact JSON for one publication (URLs, latest revision)" },
     async (uri, { slug }) => {
       const pub = registry.getPublication(String(slug));
