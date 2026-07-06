@@ -1,111 +1,126 @@
 # serve-mcp
 
-A local MCP-controlled **artifact shelf**. Agents publish generated HTML, Markdown, folders, JSON, CSV, and images; humans get stable, nicely rendered browser URLs. Built for machines running more than one agent: every agent gets its own MCP process, they all share one shelf.
+A local, MCP-controlled **artifact shelf**. Your AI agents publish the HTML, Markdown, folders, CSV, and JSON they generate; you get stable, safely-rendered browser URLs to look at them. Built for a machine running several agents at once: each agent gets its own MCP process, and they all publish to one shared shelf.
 
-```txt
-agent writes ./work.html
-agent calls artifact_publish({ source: { type: "path", path: "./work.html" }, title: "Work explanation" })
-server returns http://127.0.0.1:7331/p/work-explanation
-```
+![The shelf gallery — cards with git provenance, tags, and a per-item menu](docs/gallery.png)
 
-```txt
-MCP = control plane        (artifact_publish, artifact_list, resources)
-HTTP = human preview plane (gallery, /p/:slug, sandboxed previews)
-Registry = SQLite          (publications -> immutable artifact revisions)
-Renderer = source -> safe preview
-```
+| Markdown report, rendered | CSV as a table |
+| --- | --- |
+| ![A rendered markdown report with a provenance subbar](docs/preview-markdown.png) | ![CSV rendered as an HTML table](docs/preview-csv.png) |
 
-## Install
+## Quickstart
 
 ```bash
-npm install -g serve-mcp     # or: npx serve-mcp mcp
+npm install -g serve-mcp
 ```
 
-Add to Claude Code:
+Add it to Claude Code (it speaks MCP on stdio **and** serves the HTTP shelf):
 
 ```bash
-claude mcp add shelf -- npx -y serve-mcp mcp
+claude mcp add serve-mcp -- npx -y serve-mcp mcp
 ```
 
-The `mcp` command speaks MCP on stdio **and** serves the HTTP shelf. Ports work like this: pass `--port`/`SERVE_MCP_PORT` for a fixed port, otherwise an **ephemeral** port is used. Whoever binds records their URL in `<dataDir>/server.json`, so every other serve-mcp process (other agents, the CLI) discovers the running shelf and publishes into it instead of starting another server — that's the multi-agent story: shared SQLite registry in WAL mode, one process serving, N processes publishing.
+That's it. Ask an agent to publish something and open the URL it returns.
 
-To reach the shelf from other machines (e.g. over Tailscale), bind all interfaces:
+## How it works
 
-```bash
-serve-mcp serve --host 0.0.0.0 --port 7331
+```mermaid
+flowchart LR
+  A["AI agent"] -- "stdio" --> M["serve-mcp"]
+  B["Remote agent"] -- "HTTP /mcp" --> M
+  M --> R[("Registry<br/>SQLite · WAL")]
+  M --> S["Artifact store<br/>immutable snapshot"]
+  R --> RN["Renderer<br/>source to safe HTML"]
+  S --> RN
+  RN --> P["Sandboxed preview<br/>/p/:slug"]
+  H["Human browser"] --> P
 ```
 
-`0.0.0.0` is not a linkable address, so advertised URLs pick the best reachable name automatically: the machine's MagicDNS name (learned via reverse DNS and verified through the system resolver, so it's only used when peers can actually resolve it), else the Tailscale IP (100.64.0.0/10), else the first LAN address. `SERVE_MCP_BASE_URL` overrides everything. Detection is pure `os.networkInterfaces()` + standard DNS — no Tailscale CLI or API.
+**MCP** is the control plane (`artifact_publish`, `artifact_list`, resources). **HTTP** is the human preview plane (gallery, `/p/:slug`, sandboxed previews). The **registry** is a SQLite database mapping stable publication slots to immutable artifact revisions. The **store** snapshots every source so nothing is ever served live from your workspace.
 
-## Model-facing API (deliberately tiny)
+## The two tools
 
 ### `artifact_publish`
 
 ```jsonc
 {
-  "source": { "type": "path", "path": "./report.md" },      // or content / folder
+  "source": { "type": "path", "path": "./report.md" },   // or content / folder
   "title": "Training run explanation",
-  "slug": "training-run-explanation",                        // stable /p/<slug>; generated if omitted
-  "updateExisting": true,                                    // add revision; false -> conflict on existing slug
+  "slug": "training-run-explanation",                     // stable /p/<slug>; generated if omitted
+  "updateExisting": true,                                 // add a revision; false = conflict on an existing slug
   "tags": ["ml", "report"],
-  "renderer": { "options": { "allowScripts": false } }       // scripts stay off unless asked
+  "renderer": { "options": { "allowScripts": false } }    // scripts stay off unless asked
 }
 ```
 
-Returns the preview URL, raw URL, an MCP `resource_link`, and structured `artifact`/`publication` objects. Publications are stable slots; every publish is an immutable revision (`/p/:slug/r/:artifactId`).
+Returns the preview URL, a raw URL, an MCP `resource_link`, and structured `artifact`/`publication` objects. Publications are stable slots; every publish is an immutable revision at `/p/:slug/r/:artifactId`.
 
 ### `artifact_list`
 
-Filter by `query`, `tags`, `kind`; paginate with `cursor`; order by `createdAt|updatedAt|title`.
+Filter by `query`, `tags`, `kind`; paginate with `cursor`; order by `createdAt | updatedAt | title`.
 
 ### Resources
 
-```txt
-registry://publications   JSON list of everything on the shelf (the only listed resource)
-publication://<slug>      compact JSON (preview/raw URLs, latest revision) — read-only, not enumerated
-artifact://<id>           raw source of a revision — read-only, not enumerated
+Only `registry://publications` (JSON list of everything on the shelf) appears in `resources/list`, so host UIs stay clean no matter how many publications exist. Two more resolve when read directly (tool results link to them): `publication://<slug>` (compact JSON) and `artifact://<id>` (raw source of a revision).
+
+## Multi-agent port discovery
+
+The hard part: N agents, one shelf, no coordination. The first `serve-mcp` to start binds a port and records its reachable URL; everyone else finds that record and publishes into the running shelf instead of starting their own.
+
+```mermaid
+sequenceDiagram
+  participant A as Agent A · serve-mcp
+  participant FS as dataDir/server.json
+  participant B as Agent B · serve-mcp
+  A->>A: bind port — SERVE_MCP_PORT / --port, else ephemeral
+  A->>A: resolve advertised URL —<br/>MagicDNS name (PTR via Quad100,<br/>verified by system resolver)<br/>→ tailnet IP → LAN IP
+  A->>FS: write { baseUrl, host, port, pid }
+  B->>FS: read server.json
+  FS-->>B: { baseUrl, pid }
+  B->>B: process.kill(pid, 0) — is it alive?
+  B-->>A: reuse baseUrl, skip binding
+  Note over B: CLI publish/list discover the same way
 ```
 
-Only `registry://publications` shows up in `resources/list`, so host UIs stay clean however many publications exist; the `publication://` and `artifact://` URIs resolve when read directly (tool results include them as resource links).
-
-## Human-facing API
-
-```txt
-GET /                       gallery (search, pinned, recent)
-GET /p/:slug                latest revision, rendered
-GET /p/:slug/r/:artifactId  specific revision
-GET /raw/:artifactId        original source
-GET /meta/:artifactId       artifact metadata JSON
-GET /api/publications       JSON list
-```
+Advertised-URL resolution matters when you bind `0.0.0.0` for LAN/Tailscale access, since that isn't a linkable address. Detection is pure `os.networkInterfaces()` plus standard DNS — no Tailscale CLI or API. `SERVE_MCP_BASE_URL` overrides all of it.
 
 ## Rendering & safety
 
-Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`) — nothing serves from your workspace, and revisions are immutable. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter). HTML, Markdown output, and SVG are always served inside a sandboxed iframe with `Content-Security-Policy: script-src 'none'` — agent-generated content cannot run scripts, phone home, or touch cookies. Scripts require an explicit opt-in per artifact (`renderer.options.allowScripts: true`), which loosens the sandbox to `allow-scripts` for that artifact only. The server binds `127.0.0.1` unless you opt into `0.0.0.0`; there is no auth, so only expose it to networks you trust (a Tailscale tailnet qualifies, the open internet does not). Path publishing can be restricted with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
+Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`), so nothing is served from your workspace and revisions never change. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
 
-JSON pretty-prints, CSV becomes a table, folders serve as static sites behind the same sandbox. Folder navigation works like a classic file server: each directory serves its own `index.html`/`index.md`/`README.md` (or pass `entrypoint`), `dir` redirects to `dir/` so relative and `../` links resolve, and directories without an index get a browsable listing with a `../` entry. In-folder Markdown renders on the fly, so `.md` files can link to each other across directories.
+Every HTML, Markdown, and SVG preview is served inside a sandboxed iframe with `Content-Security-Policy: script-src 'none'` — agent-generated content **cannot run scripts, phone home, or touch cookies**. Scripts are an explicit per-artifact opt-in (`renderer.options.allowScripts: true`), which loosens the sandbox to `allow-scripts` for that one artifact.
 
-## CLI
+The server binds `127.0.0.1` unless you opt into `0.0.0.0`, and there is no auth — only expose it to networks you trust (a Tailscale tailnet qualifies; the open internet does not). Restrict path publishing with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 
-```bash
-serve-mcp serve                                  # HTTP shelf only
-serve-mcp publish ./report.md --title "Report"   # publish without an agent
-serve-mcp list
-```
+### Folder navigation
 
-## Config
+Folders behave like a classic file server: each directory serves its own `index.html` / `index.md` / `README.md` (or pass `entrypoint`), `dir` redirects to `dir/` so relative and `../` links resolve, and directories without an index get a browsable listing with a `../` entry. In-folder Markdown/CSV/JSON render on the fly, and any file is downloadable with `?raw`.
 
-Environment variables (all optional):
+### Provenance capture
+
+Every publish records where it came from — source directory plus git branch, remote, and commit — read straight from `.git` files (no `git` subprocess, works even without git installed). This shows on the gallery cards and the preview subbar.
+
+## HTTP routes
 
 ```txt
-SERVE_MCP_HOST           bind host, default 127.0.0.1 (0.0.0.0 for LAN/Tailscale)
-SERVE_MCP_PORT           fixed port; unset = ephemeral + discovery via server.json
-SERVE_MCP_BASE_URL       advertised URL override (e.g. MagicDNS name)
-SERVE_MCP_DATA_DIR       default ~/.local/share/serve-mcp
-SERVE_MCP_ALLOWED_ROOTS  colon-separated roots for path/folder publishing (default: anywhere readable)
+GET    /                         gallery (search, pinned, recent)
+GET    /p/:slug                  latest revision, rendered
+GET    /p/:slug/r/:artifactId    a specific revision
+GET    /raw/:artifactId          original source
+GET    /meta/:artifactId         artifact metadata JSON
+GET    /api/publications         JSON list (query, cursor, limit)
+DELETE /api/publications/:slug   remove a publication and all its revisions
 ```
 
-`--port` and `--host` flags on `serve`/`mcp` override the env.
+## Tailscale / LAN access
+
+To reach the shelf from other machines, bind all interfaces:
+
+```bash
+serve-mcp serve --host 0.0.0.0 --port 7331
+```
+
+Advertised URLs then pick the best reachable name automatically: MagicDNS name (learned via reverse DNS through Quad100 and verified with the system resolver, so it's only used when peers can actually resolve it) → Tailscale IP (`100.64.0.0/10`) → first LAN address. Tailnet detection needs no Tailscale tooling — it keys off the interface's CGNAT address and Tailscale's ULA prefix.
 
 ## MCP over HTTP (experimental)
 
@@ -116,11 +131,29 @@ The shelf also speaks MCP at `<baseUrl>/mcp` (Streamable HTTP transport, statele
 claude mcp add shelf-a --transport http http://100.x.y.z:7331/mcp
 ```
 
-Run a shelf on each machine and point them at each other, and publishing works in both directions. Caveat: `path`/`folder` sources are read from the filesystem of the machine *running the shelf* — remote publishers should use `content` sources. Tailnet detection needs no Tailscale tooling.
+Run a shelf on each machine and point them at each other for bidirectional publishing. Caveat: `path`/`folder` sources are read from the filesystem of the machine *running* the shelf, so remote publishers should use `content` sources.
 
-## Non-goals
+## CLI
 
-Not a CDN, not a deploy platform, not a filesystem browser, not a CMS. It does one thing: **publish generated artifacts → render safely → remember them → list them.**
+```bash
+serve-mcp serve                                  # HTTP shelf only
+serve-mcp publish ./report.md --title "Report"   # publish without an agent
+serve-mcp list                                   # (also discovers a running shelf)
+```
+
+## Config
+
+All optional:
+
+```txt
+SERVE_MCP_HOST           bind host, default 127.0.0.1 (0.0.0.0 for LAN/Tailscale)
+SERVE_MCP_PORT           fixed port; unset = ephemeral + discovery via server.json
+SERVE_MCP_BASE_URL       advertised-URL override (e.g. a MagicDNS name)
+SERVE_MCP_DATA_DIR       default ~/.local/share/serve-mcp
+SERVE_MCP_ALLOWED_ROOTS  colon-separated roots for path/folder publishing (default: anywhere readable)
+```
+
+`--port` and `--host` flags on `serve` / `mcp` override the environment.
 
 ## Development
 
@@ -128,7 +161,13 @@ Not a CDN, not a deploy platform, not a filesystem browser, not a CMS. It does o
 npm install
 npm test          # typecheck + node:test — core, http, mcp round-trip
 npm start         # HTTP server
-npm run build     # tsc -> dist/ (what npm ships)
+npm run build     # tsc -> dist/
 ```
 
-Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. Requires Node ≥ 22.18 (type stripping + built-in `node:sqlite`). MIT.
+Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. Requires **Node ≥ 22.18** (type stripping + built-in `node:sqlite`).
+
+## Non-goals
+
+Not a CDN, not a deploy platform, not a filesystem browser, not a CMS. It does one thing: **publish generated artifacts → render safely → remember them → list them.**
+
+MIT.
