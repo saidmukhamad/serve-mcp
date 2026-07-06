@@ -27,7 +27,15 @@ Add to Claude Code:
 claude mcp add shelf -- npx -y serve-mcp mcp
 ```
 
-The `mcp` command speaks MCP on stdio **and** starts the HTTP shelf on `127.0.0.1:7331`. If the port is already bound, another serve-mcp process (another agent) is serving the shared shelf, and this one just publishes into it — that's the multi-agent story: shared SQLite registry in WAL mode, one process serving, N processes publishing.
+The `mcp` command speaks MCP on stdio **and** serves the HTTP shelf. Ports work like this: pass `--port`/`SERVE_MCP_PORT` for a fixed port, otherwise an **ephemeral** port is used. Whoever binds records their URL in `<dataDir>/server.json`, so every other serve-mcp process (other agents, the CLI) discovers the running shelf and publishes into it instead of starting another server — that's the multi-agent story: shared SQLite registry in WAL mode, one process serving, N processes publishing.
+
+To reach the shelf from other machines (e.g. over Tailscale), bind all interfaces:
+
+```bash
+serve-mcp serve --host 0.0.0.0 --port 7331
+```
+
+`0.0.0.0` is not a linkable address, so advertised URLs automatically use your Tailscale IP (100.64.0.0/10 preferred) or first LAN address; override with `SERVE_MCP_BASE_URL` (e.g. a MagicDNS name).
 
 ## Model-facing API (deliberately tiny)
 
@@ -71,7 +79,7 @@ GET /api/publications       JSON list
 
 ## Rendering & safety
 
-Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`) — nothing serves from your workspace, and revisions are immutable. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter). HTML, Markdown output, and SVG are always served inside a sandboxed iframe with `Content-Security-Policy: script-src 'none'` — agent-generated content cannot run scripts, phone home, or touch cookies. Scripts require an explicit opt-in per artifact (`renderer.options.allowScripts: true`), which loosens the sandbox to `allow-scripts` for that artifact only. The server binds `127.0.0.1` only. Path publishing can be restricted with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
+Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`) — nothing serves from your workspace, and revisions are immutable. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter). HTML, Markdown output, and SVG are always served inside a sandboxed iframe with `Content-Security-Policy: script-src 'none'` — agent-generated content cannot run scripts, phone home, or touch cookies. Scripts require an explicit opt-in per artifact (`renderer.options.allowScripts: true`), which loosens the sandbox to `allow-scripts` for that artifact only. The server binds `127.0.0.1` unless you opt into `0.0.0.0`; there is no auth, so only expose it to networks you trust (a Tailscale tailnet qualifies, the open internet does not). Path publishing can be restricted with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 
 JSON pretty-prints, CSV becomes a table, folders serve as static sites behind the same sandbox. Folder navigation works like a classic file server: each directory serves its own `index.html`/`index.md`/`README.md` (or pass `entrypoint`), `dir` redirects to `dir/` so relative and `../` links resolve, and directories without an index get a browsable listing with a `../` entry. In-folder Markdown renders on the fly, so `.md` files can link to each other across directories.
 
@@ -88,11 +96,14 @@ serve-mcp list
 Environment variables (all optional):
 
 ```txt
-SERVE_MCP_HOST           default 127.0.0.1
-SERVE_MCP_PORT           default 7331
+SERVE_MCP_HOST           bind host, default 127.0.0.1 (0.0.0.0 for LAN/Tailscale)
+SERVE_MCP_PORT           fixed port; unset = ephemeral + discovery via server.json
+SERVE_MCP_BASE_URL       advertised URL override (e.g. MagicDNS name)
 SERVE_MCP_DATA_DIR       default ~/.local/share/serve-mcp
 SERVE_MCP_ALLOWED_ROOTS  colon-separated roots for path/folder publishing (default: anywhere readable)
 ```
+
+`--port` and `--host` flags on `serve`/`mcp` override the env.
 
 ## Non-goals
 

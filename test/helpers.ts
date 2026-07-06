@@ -7,9 +7,9 @@ import { loadConfig } from "../src/config.ts";
 
 let portCounter = 17400 + (process.pid % 100);
 
-export function makeDeps() {
+export function makeDeps({ ephemeral = false } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "serve-mcp-test-"));
-  const config = loadConfig({ dataDir, port: portCounter++, host: "127.0.0.1" });
+  const config = loadConfig({ dataDir, port: ephemeral ? undefined : portCounter++, host: "127.0.0.1" });
   const store = new ArtifactStore(dataDir);
   const registry = new Registry(dataDir);
   const cleanup = () => {
