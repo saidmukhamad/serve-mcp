@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import { detectTailnetIPv4 } from "./tailnet.ts";
 import type { Config } from "./types.ts";
 
 export interface ConfigOverrides {
@@ -32,34 +33,6 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
 export function advertiseHost(bindHost: string): string {
   if (bindHost !== "0.0.0.0" && bindHost !== "::") return bindHost;
   return detectTailnetIPv4() ?? firstExternalIPv4() ?? "127.0.0.1";
-}
-
-// Tailscale's registered ULA prefix; its presence on an interface identifies
-// a tailnet without any Tailscale tooling.
-const TAILSCALE_ULA = /^fd7a:115c:a1e0:/i;
-
-function isCgnat(addr: string): boolean {
-  const [a, b] = addr.split(".").map(Number);
-  return a === 100 && b! >= 64 && b! <= 127;
-}
-
-export function detectTailnetIPv4(
-  interfaces: NodeJS.Dict<os.NetworkInterfaceInfo[]> = os.networkInterfaces()
-): string | null {
-  let fallback: string | null = null;
-  for (const [name, addrs] of Object.entries(interfaces)) {
-    if (!addrs) continue;
-    const v4 = addrs.find(
-      (a): a is os.NetworkInterfaceInfoIPv4 => a.family === "IPv4" && !a.internal && isCgnat(a.address)
-    );
-    if (!v4) continue;
-    const hasUla = addrs.some((a) => a.family === "IPv6" && TAILSCALE_ULA.test(a.address));
-    if (hasUla || name === "tailscale0" || name.toLowerCase().includes("tailscale")) return v4.address;
-    // CGNAT + /32 point-to-point is how tailscale/wireguard meshes look;
-    // a plain CGNAT address (cellular tethering) has a wider netmask.
-    if (v4.netmask === "255.255.255.255") fallback ??= v4.address;
-  }
-  return fallback;
 }
 
 function firstExternalIPv4(): string | null {

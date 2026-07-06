@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { detectMime, FOLDER_INDEXES } from "./kinds.ts";
 import { advertiseHost } from "./config.ts";
+import { isCgnat, resolveTailnetDnsName } from "./tailnet.ts";
 import { writeServerInfo } from "./server-info.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
 import type { ArtifactStore } from "./store.ts";
@@ -167,10 +168,15 @@ export function startHttp(deps: Deps): Promise<{ server: ServerType; baseUrl: st
   const app = createApp(deps);
   return new Promise((resolve, reject) => {
     const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port ?? 0 }, (addr) => {
-      const baseUrl = config.baseUrl ?? `http://${advertiseHost(config.host)}:${addr.port}`;
-      config.baseUrl = baseUrl;
-      writeServerInfo(config.dataDir, { baseUrl, host: config.host, port: addr.port });
-      resolve({ server, baseUrl });
+      void (async () => {
+        let host = advertiseHost(config.host);
+        // A tailnet IP usually has a MagicDNS name — advertise that instead.
+        if (!config.baseUrl && isCgnat(host)) host = (await resolveTailnetDnsName(host)) ?? host;
+        const baseUrl = config.baseUrl ?? `http://${host}:${addr.port}`;
+        config.baseUrl = baseUrl;
+        writeServerInfo(config.dataDir, { baseUrl, host: config.host, port: addr.port });
+        resolve({ server, baseUrl });
+      })().catch(reject);
     });
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") resolve(null);

@@ -35,7 +35,7 @@ To reach the shelf from other machines (e.g. over Tailscale), bind all interface
 serve-mcp serve --host 0.0.0.0 --port 7331
 ```
 
-`0.0.0.0` is not a linkable address, so advertised URLs automatically use your Tailscale IP (100.64.0.0/10 preferred) or first LAN address; override with `SERVE_MCP_BASE_URL` (e.g. a MagicDNS name).
+`0.0.0.0` is not a linkable address, so advertised URLs pick the best reachable name automatically: the machine's MagicDNS name (learned via reverse DNS and verified through the system resolver, so it's only used when peers can actually resolve it), else the Tailscale IP (100.64.0.0/10), else the first LAN address. `SERVE_MCP_BASE_URL` overrides everything. Detection is pure `os.networkInterfaces()` + standard DNS — no Tailscale CLI or API.
 
 ## Model-facing API (deliberately tiny)
 
