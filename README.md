@@ -24,19 +24,12 @@ That's it. Ask an agent to publish something and open the URL it returns.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  A["AI agent"] -- "stdio" --> M["serve-mcp"]
-  B["Remote agent"] -- "HTTP /mcp" --> M
-  M --> R[("Registry<br/>SQLite · WAL")]
-  M --> S["Artifact store<br/>immutable snapshot"]
-  R --> RN["Renderer<br/>source to safe HTML"]
-  S --> RN
-  RN --> P["Sandboxed preview<br/>/p/:slug"]
-  H["Human browser"] --> P
+```txt
+MCP = control plane        (artifact_publish, artifact_list, resources)
+HTTP = human preview plane (gallery, /p/:slug, sandboxed previews)
+Registry = SQLite          (stable publications -> immutable revisions)
+Store = snapshots          (nothing is served live from your workspace)
 ```
-
-**MCP** is the control plane (`artifact_publish`, `artifact_list`, resources). **HTTP** is the human preview plane (gallery, `/p/:slug`, sandboxed previews). The **registry** is a SQLite database mapping stable publication slots to immutable artifact revisions. The **store** snapshots every source so nothing is ever served live from your workspace.
 
 ## The two tools
 
@@ -65,24 +58,7 @@ Only `registry://publications` (JSON list of everything on the shelf) appears in
 
 ## Multi-agent port discovery
 
-The hard part: N agents, one shelf, no coordination. The first `serve-mcp` to start binds a port and records its reachable URL; everyone else finds that record and publishes into the running shelf instead of starting their own.
-
-```mermaid
-sequenceDiagram
-  participant A as Agent A · serve-mcp
-  participant FS as dataDir/server.json
-  participant B as Agent B · serve-mcp
-  A->>A: bind port — SERVE_MCP_PORT / --port, else ephemeral
-  A->>A: resolve advertised URL —<br/>MagicDNS name (PTR via Quad100,<br/>verified by system resolver)<br/>→ tailnet IP → LAN IP
-  A->>FS: write { baseUrl, host, port, pid }
-  B->>FS: read server.json
-  FS-->>B: { baseUrl, pid }
-  B->>B: process.kill(pid, 0) — is it alive?
-  B-->>A: reuse baseUrl, skip binding
-  Note over B: CLI publish/list discover the same way
-```
-
-Advertised-URL resolution matters when you bind `0.0.0.0` for LAN/Tailscale access, since that isn't a linkable address. Detection is pure `os.networkInterfaces()` plus standard DNS — no Tailscale CLI or API. `SERVE_MCP_BASE_URL` overrides all of it.
+N agents, one shelf, no coordination. The first `serve-mcp` to start binds a port (`--port`/`SERVE_MCP_PORT`, else ephemeral) and records its reachable URL in `<dataDir>/server.json`; every other serve-mcp process — agents, the CLI — finds that record, checks the pid is alive, and publishes into the running shelf instead of starting its own.
 
 ## Rendering & safety
 
