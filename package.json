@@ -1,6 +1,6 @@
 {
   "name": "serve-mcp",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Local MCP-controlled artifact shelf: agents publish HTML, Markdown, folders and files; humans get nice preview URLs.",
   "keywords": [
     "mcp",
