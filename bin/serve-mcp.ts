@@ -8,6 +8,7 @@ import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry
 import { startHttp, type Deps } from "../src/http.ts";
 import { createMcpServer } from "../src/mcp.ts";
 import { readServerInfo } from "../src/server-info.ts";
+import { installService, restartService, uninstallService } from "../src/service.ts";
 import { captureContext } from "../src/provenance.ts";
 
 const USAGE = `serve-mcp — local MCP-controlled artifact shelf
@@ -18,6 +19,7 @@ Usage:
   serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server
   serve-mcp publish <path> [opts]             publish a file/folder from the CLI
   serve-mcp list                              list publications
+  serve-mcp service install|restart|uninstall always-on shelf (launchd / systemd --user)
   serve-mcp mcp [--port <p>] [--host <h>]     run MCP server on stdio (for MCP clients)
 
 Examples:
@@ -129,6 +131,24 @@ if (cmd === "mcp") {
   const d = deps(config);
   printPublications(d, info?.baseUrl ?? config.baseUrl ?? "");
   d.registry.close();
+} else if (cmd === "service") {
+  const config = loadConfig();
+  const action = rest[0];
+  if (action === "install") {
+    if (config.port === null) {
+      console.error(
+        "[serve-mcp] tip: set a fixed port first (`serve-mcp config port 7331`) so URLs survive restarts"
+      );
+    }
+    console.log(installService(config.dataDir));
+  } else if (action === "restart") {
+    console.log(restartService());
+  } else if (action === "uninstall") {
+    console.log(uninstallService());
+  } else {
+    console.error("usage: serve-mcp service install|restart|uninstall");
+    process.exit(1);
+  }
 } else if (cmd === "config") {
   const config = loadConfig();
   const [key, value] = rest;

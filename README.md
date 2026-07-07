@@ -92,6 +92,17 @@ GET    /api/publications         JSON list (query, cursor, limit)
 DELETE /api/publications/:slug   remove a publication and all its revisions
 ```
 
+## Always-on shelf
+
+The shelf normally lives as long as some MCP session is running (the first one starts it). To keep it up permanently — one server every agent and human on the machine works against:
+
+```bash
+serve-mcp config port 7331     # fixed port, stable URLs
+serve-mcp service install      # launchd on macOS, systemd --user on Linux
+```
+
+`serve-mcp service restart` applies config changes; `serve-mcp service uninstall` removes it. The service pins the current runtime and package paths (shown on install) — re-run install after upgrading either.
+
 ## Tailscale / LAN access
 
 To reach the shelf from other machines:
