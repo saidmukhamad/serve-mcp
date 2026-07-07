@@ -3,9 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+export const SERVICE_LABEL = "io.github.saidmukhamad.serve-mcp";
+const LEGACY_LABELS = ["serve-mcp"];
+
 export interface ServicePaths {
   node: string;
   bin: string;
+  dataDir: string;
   logFile: string;
 }
 
@@ -15,12 +19,12 @@ function xml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function launchdPlist({ node, bin, logFile }: ServicePaths): string {
+export function launchdPlist({ node, bin, dataDir, logFile }: ServicePaths): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>serve-mcp</string>
+  <key>Label</key><string>${SERVICE_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
     <string>${xml(node)}</string>
@@ -29,6 +33,9 @@ export function launchdPlist({ node, bin, logFile }: ServicePaths): string {
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>WorkingDirectory</key><string>${xml(dataDir)}</string>
   <key>StandardOutPath</key><string>${xml(logFile)}</string>
   <key>StandardErrorPath</key><string>${xml(logFile)}</string>
 </dict>
@@ -36,13 +43,16 @@ export function launchdPlist({ node, bin, logFile }: ServicePaths): string {
 `;
 }
 
-export function systemdUnit({ node, bin }: ServicePaths): string {
+export function systemdUnit({ node, bin, dataDir }: ServicePaths): string {
   return `[Unit]
 Description=serve-mcp artifact shelf
+Documentation=https://github.com/saidmukhamad/serve-mcp
 
 [Service]
 ExecStart="${node}" "${bin}" serve
+WorkingDirectory=${dataDir}
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=default.target
@@ -72,36 +82,50 @@ export function runtimeWarnings(paths: ServicePaths, version = process.version):
 
 function servicePaths(dataDir: string): ServicePaths {
   const bin = fs.realpathSync(process.argv[1]!);
-  const paths = { node: process.execPath, bin, logFile: path.join(dataDir, "serve.log") };
+  const paths = { node: process.execPath, bin, dataDir, logFile: path.join(dataDir, "serve.log") };
   for (const w of runtimeWarnings(paths)) console.error(`[serve-mcp] warning: ${w}`);
   return paths;
 }
 
-function run(cmd: string, args: string[], ignoreFailure = false): void {
+function run(cmd: string, args: string[], ignoreFailure = false): string {
   try {
-    execFileSync(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
+    return execFileSync(cmd, args, { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" });
   } catch (err) {
     if (!ignoreFailure) throw err;
+    return "";
   }
 }
 
-function plistPath(): string {
-  return path.join(os.homedir(), "Library/LaunchAgents/serve-mcp.plist");
+function gui(label: string): string {
+  return `gui/${process.getuid!()}/${label}`;
+}
+
+function plistPath(label: string): string {
+  return path.join(os.homedir(), "Library/LaunchAgents", `${label}.plist`);
 }
 
 function unitPath(): string {
   return path.join(os.homedir(), ".config/systemd/user/serve-mcp.service");
 }
 
+function removeLegacyDarwin(): void {
+  for (const label of LEGACY_LABELS) {
+    run("launchctl", ["bootout", gui(label)], true);
+    fs.rmSync(plistPath(label), { force: true });
+  }
+}
+
 export function installService(dataDir: string): string {
   const paths = servicePaths(dataDir);
   fs.mkdirSync(dataDir, { recursive: true });
   if (process.platform === "darwin") {
-    const plist = plistPath();
+    removeLegacyDarwin();
+    const plist = plistPath(SERVICE_LABEL);
     fs.mkdirSync(path.dirname(plist), { recursive: true });
-    run("launchctl", ["unload", "-w", plist], true);
+    run("launchctl", ["bootout", gui(SERVICE_LABEL)], true);
     fs.writeFileSync(plist, launchdPlist(paths));
-    run("launchctl", ["load", "-w", plist]);
+    run("launchctl", ["bootstrap", `gui/${process.getuid!()}`, plist]);
+    run("launchctl", ["enable", gui(SERVICE_LABEL)], true);
     return `installed launchd agent: ${plist}\nruntime: ${paths.node}\nbin: ${paths.bin}\nlogs: ${paths.logFile}`;
   }
   if (process.platform === "linux") {
@@ -122,7 +146,7 @@ export function installService(dataDir: string): string {
 
 export function restartService(): string {
   if (process.platform === "darwin") {
-    run("launchctl", ["kickstart", "-k", `gui/${process.getuid!()}/serve-mcp`]);
+    run("launchctl", ["kickstart", "-k", gui(SERVICE_LABEL)]);
     return "restarted";
   }
   if (process.platform === "linux") {
@@ -132,10 +156,26 @@ export function restartService(): string {
   throw new Error(`service restart not supported on ${process.platform}`);
 }
 
+export function serviceStatus(): string {
+  if (process.platform === "darwin") {
+    const out = run("launchctl", ["print", gui(SERVICE_LABEL)], true);
+    if (!out) return "service: not installed";
+    const state = out.match(/state = (\S+)/)?.[1] ?? "unknown";
+    const pid = out.match(/pid = (\d+)/)?.[1];
+    return `service: ${state}${pid ? ` (pid ${pid})` : ""}`;
+  }
+  if (process.platform === "linux") {
+    const out = run("systemctl", ["--user", "is-active", "serve-mcp"], true).trim();
+    return `service: ${out || "not installed"}`;
+  }
+  return "service: not supported on this platform";
+}
+
 export function uninstallService(): string {
   if (process.platform === "darwin") {
-    const plist = plistPath();
-    run("launchctl", ["unload", "-w", plist], true);
+    removeLegacyDarwin();
+    const plist = plistPath(SERVICE_LABEL);
+    run("launchctl", ["bootout", gui(SERVICE_LABEL)], true);
     fs.rmSync(plist, { force: true });
     return `removed ${plist}`;
   }

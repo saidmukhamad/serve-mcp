@@ -1,22 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { launchdPlist, systemdUnit, runtimeWarnings } from "../src/service.ts";
+import { launchdPlist, systemdUnit, runtimeWarnings, SERVICE_LABEL } from "../src/service.ts";
 
-const paths = { node: "/usr/local/bin/node", bin: "/opt/serve-mcp/bin/serve-mcp.js", logFile: "/data/serve.log" };
+const paths = {
+  node: "/usr/local/bin/node",
+  bin: "/opt/serve-mcp/bin/serve-mcp.js",
+  dataDir: "/data",
+  logFile: "/data/serve.log",
+};
 
-test("launchdPlist: runs `serve`, keeps alive, logs to data dir", () => {
+test("launchdPlist: reverse-DNS label, runs `serve`, keeps alive, background type", () => {
   const plist = launchdPlist(paths);
+  assert.match(plist, new RegExp(`<string>${SERVICE_LABEL.replace(/\./g, "\\.")}</string>`));
   assert.match(plist, /<string>\/usr\/local\/bin\/node<\/string>/);
   assert.match(plist, /<string>\/opt\/serve-mcp\/bin\/serve-mcp\.js<\/string>/);
   assert.match(plist, /<string>serve<\/string>/);
   assert.match(plist, /<key>KeepAlive<\/key><true\/>/);
+  assert.match(plist, /<key>ProcessType<\/key><string>Background<\/string>/);
+  assert.match(plist, /<key>ThrottleInterval<\/key><integer>10<\/integer>/);
   assert.match(plist, /<string>\/data\/serve\.log<\/string>/);
 });
 
 test("systemdUnit: quoted ExecStart, restarts on failure", () => {
   const unit = systemdUnit(paths);
   assert.match(unit, /ExecStart="\/usr\/local\/bin\/node" "\/opt\/serve-mcp\/bin\/serve-mcp\.js" serve/);
+  assert.match(unit, /WorkingDirectory=\/data/);
   assert.match(unit, /Restart=on-failure/);
+  assert.match(unit, /RestartSec=5/);
   assert.match(unit, /WantedBy=default\.target/);
 });
 

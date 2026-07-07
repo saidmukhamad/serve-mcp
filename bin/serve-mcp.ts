@@ -8,7 +8,7 @@ import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry
 import { startHttp, type Deps } from "../src/http.ts";
 import { createMcpServer } from "../src/mcp.ts";
 import { readServerInfo } from "../src/server-info.ts";
-import { installService, restartService, uninstallService } from "../src/service.ts";
+import { installService, restartService, serviceStatus, uninstallService } from "../src/service.ts";
 import { captureContext } from "../src/provenance.ts";
 
 const USAGE = `serve-mcp — local MCP-controlled artifact shelf
@@ -19,7 +19,8 @@ Usage:
   serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server
   serve-mcp publish <path> [opts]             publish a file/folder from the CLI
   serve-mcp list                              list publications
-  serve-mcp service install|restart|uninstall always-on shelf (launchd / systemd --user)
+  serve-mcp service install|status|restart|uninstall
+                                              always-on shelf (launchd / systemd --user)
   serve-mcp mcp [--port <p>] [--host <h>]     run MCP server on stdio (for MCP clients)
 
 Examples:
@@ -143,10 +144,12 @@ if (cmd === "mcp") {
     console.log(installService(config.dataDir));
   } else if (action === "restart") {
     console.log(restartService());
+  } else if (action === "status" || action === undefined) {
+    console.log(serviceStatus());
   } else if (action === "uninstall") {
     console.log(uninstallService());
   } else {
-    console.error("usage: serve-mcp service install|restart|uninstall");
+    console.error("usage: serve-mcp service install|status|restart|uninstall");
     process.exit(1);
   }
 } else if (cmd === "config") {
