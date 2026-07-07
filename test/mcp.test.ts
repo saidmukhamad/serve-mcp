@@ -22,6 +22,16 @@ interface PublishStructured {
   urls: { raw: string; preview: string };
 }
 
+test("server advertises instructions steering agents to the shelf", async () => {
+  const { client, cleanup } = await connect();
+  const instructions = client.getInstructions();
+  assert.ok(instructions);
+  assert.match(instructions, /artifact_publish/);
+  assert.match(instructions, /preview URL/);
+  await client.close();
+  cleanup();
+});
+
 test("artifact_publish + artifact_list + resources round trip", async () => {
   const { client, cleanup } = await connect();
 

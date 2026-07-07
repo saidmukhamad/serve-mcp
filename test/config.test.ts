@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { loadConfig, advertiseHost } from "../src/config.ts";
+import { loadConfig, advertiseHost, setConfigValue, configFilePath } from "../src/config.ts";
 import { startHttp } from "../src/http.ts";
 import { readServerInfo, writeServerInfo } from "../src/server-info.ts";
 import { makeDeps } from "./helpers.ts";
@@ -44,6 +44,24 @@ test("loadConfig: config.json in dataDir applies, env and flags override it", ()
 
   fs.writeFileSync(`${dataDir}/config.json`, "not json{");
   assert.equal(loadConfig({ dataDir }).host, "127.0.0.1", "broken file falls back to defaults");
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
+test("setConfigValue: writes config.json, empty value unsets, invalid port rejected", () => {
+  const dataDir = fs.mkdtempSync("/tmp/serve-mcp-set-");
+
+  setConfigValue(dataDir, "host", "0.0.0.0");
+  setConfigValue(dataDir, "port", "7331");
+  const written = JSON.parse(fs.readFileSync(configFilePath(dataDir), "utf8"));
+  assert.deepEqual(written, { host: "0.0.0.0", port: 7331 });
+  assert.equal(loadConfig({ dataDir }).host, "0.0.0.0");
+  assert.equal(loadConfig({ dataDir }).port, 7331);
+
+  setConfigValue(dataDir, "host", "");
+  assert.equal(loadConfig({ dataDir }).host, "127.0.0.1");
+
+  assert.throws(() => setConfigValue(dataDir, "port", "banana"));
+  assert.throws(() => setConfigValue(dataDir, "port", "70000"));
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

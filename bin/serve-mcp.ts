@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+import "../src/quiet.ts";
 import { parseArgs } from "node:util";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadConfig } from "../src/config.ts";
+import { loadConfig, configFilePath, setConfigValue, CONFIG_KEYS, type ConfigKey } from "../src/config.ts";
 import { ArtifactStore } from "../src/store.ts";
 import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry.ts";
 import { startHttp, type Deps } from "../src/http.ts";
@@ -12,14 +13,19 @@ import { captureContext } from "../src/provenance.ts";
 const USAGE = `serve-mcp — local MCP-controlled artifact shelf
 
 Usage:
-  serve-mcp mcp [--port <p>] [--host <h>]     run MCP server on stdio (serves HTTP too)
-  serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server only
+  serve-mcp                                   show shelf status and publications
+  serve-mcp config [<key> [<value>]]          show or set config (host, port, baseUrl)
+  serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server
   serve-mcp publish <path> [opts]             publish a file/folder from the CLI
   serve-mcp list                              list publications
+  serve-mcp mcp [--port <p>] [--host <h>]     run MCP server on stdio (for MCP clients)
 
-Without --port / SERVE_MCP_PORT an ephemeral port is used and recorded in the
-data dir, so other serve-mcp processes find the running shelf automatically.
-Bind --host 0.0.0.0 to reach the shelf over your LAN/Tailscale network.
+Examples:
+  serve-mcp config host 0.0.0.0    reachable over LAN/Tailscale
+  serve-mcp config port 7331       fixed port (empty value unsets a key)
+
+Without a configured port an ephemeral one is used and recorded in the data
+dir, so other serve-mcp processes find the running shelf automatically.
 
 Publish options:
   --title <t>   --slug <s>   --update   --tag <t> (repeatable)
@@ -31,7 +37,8 @@ Env:
   SERVE_MCP_ALLOWED_ROOTS (colon-separated publish roots)
 `;
 
-const [cmd = "mcp", ...rest] = process.argv.slice(2);
+const [cmdArg, ...rest] = process.argv.slice(2);
+const cmd = cmdArg ?? (process.stdin.isTTY ? "status" : "mcp");
 
 function serverFlags(args: string[]) {
   const { values } = parseArgs({
@@ -110,15 +117,56 @@ if (cmd === "mcp") {
 } else if (cmd === "list") {
   const config = loadConfig();
   const d = deps(config);
-  const baseUrl = resolveBaseUrl(config);
-  const { publications } = d.registry.listPublications({ limit: 200 });
-  for (const p of publications) {
-    console.log(`${p.slug}\t${p.kind}\t${p.revisions.length} rev\t${baseUrl}/p/${p.slug}`);
-  }
+  printPublications(d, resolveBaseUrl(config));
   d.registry.close();
+} else if (cmd === "status") {
+  const config = loadConfig();
+  const info = readServerInfo(config.dataDir);
+  if (info) console.log(`shelf: ${info.baseUrl} (pid ${info.pid})`);
+  else console.log("shelf: not running — starts with any MCP session, or `serve-mcp serve`");
+  console.log(`data:  ${config.dataDir}`);
+  console.log("");
+  const d = deps(config);
+  printPublications(d, info?.baseUrl ?? config.baseUrl ?? "");
+  d.registry.close();
+} else if (cmd === "config") {
+  const config = loadConfig();
+  const [key, value] = rest;
+  if (key !== undefined && !(CONFIG_KEYS as readonly string[]).includes(key)) {
+    console.error(`unknown key: ${key} (valid: ${CONFIG_KEYS.join(", ")})`);
+    process.exit(1);
+  }
+  if (key !== undefined && value !== undefined) {
+    const file = setConfigValue(config.dataDir, key as ConfigKey, value);
+    console.log(JSON.stringify(file, null, 2).trim());
+    console.log(`written to ${configFilePath(config.dataDir)} — restart the shelf to apply`);
+  } else {
+    const effective: Record<ConfigKey, string> = {
+      host: config.host,
+      port: config.port === null ? "(ephemeral)" : String(config.port),
+      baseUrl: config.baseUrl ?? "(auto)",
+    };
+    if (key !== undefined) {
+      console.log(effective[key as ConfigKey]);
+    } else {
+      console.log(`file: ${configFilePath(config.dataDir)}`);
+      for (const k of CONFIG_KEYS) console.log(`${k} = ${effective[k]}`);
+    }
+  }
 } else {
   console.error(USAGE);
   process.exit(cmd === "help" || cmd === "--help" ? 0 : 1);
+}
+
+function printPublications(d: Deps, baseUrl: string) {
+  const { publications } = d.registry.listPublications({ limit: 200 });
+  if (publications.length === 0) {
+    console.log("(shelf is empty)");
+    return;
+  }
+  for (const p of publications) {
+    console.log(`${p.slug}\t${p.kind}\t${p.revisions.length} rev\t${baseUrl}/p/${p.slug}`);
+  }
 }
 
 function resolveBaseUrl(config: ReturnType<typeof loadConfig>): string {

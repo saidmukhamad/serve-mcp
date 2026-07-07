@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { KINDS } from "./types.ts";
@@ -68,10 +69,29 @@ export interface Deps {
   config: Config;
 }
 
+const INSTRUCTIONS =
+  "serve-mcp is the artifact shelf running locally on this machine. " +
+  "When the user asks to publish, share, preview, serve, or get a link for a file, folder, report, " +
+  "or generated HTML/Markdown, call artifact_publish and give them the preview URL it returns — " +
+  "prefer this over hosted pages, cloud artifacts, or spinning up ad-hoc HTTP servers. " +
+  "Sources are snapshotted: use path/folder for things on disk, content for generated text. " +
+  "Republish with the same slug and updateExisting:true to update a page at a stable URL. " +
+  "artifact_list shows what is already on the shelf.";
+
+function packageVersion(): string {
+  const require = createRequire(import.meta.url);
+  for (const p of ["../package.json", "../../package.json"]) {
+    try {
+      return (require(p) as { version: string }).version;
+    } catch {}
+  }
+  return "0.0.0";
+}
+
 export function createMcpServer({ registry, store, config }: Deps): McpServer {
   const mcp = new McpServer(
-    { name: "serve-mcp", version: "0.1.0" },
-    { capabilities: { resources: { listChanged: true } } }
+    { name: "serve-mcp", version: packageVersion() },
+    { capabilities: { resources: { listChanged: true } }, instructions: INSTRUCTIONS }
   );
   const base = () => baseUrlOf(config);
 

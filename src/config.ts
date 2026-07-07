@@ -52,6 +52,29 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   };
 }
 
+export const CONFIG_KEYS = ["host", "port", "baseUrl"] as const;
+export type ConfigKey = (typeof CONFIG_KEYS)[number];
+
+export function configFilePath(dataDir: string): string {
+  return path.join(dataDir, "config.json");
+}
+
+export function setConfigValue(dataDir: string, key: ConfigKey, value: string): ConfigFile {
+  const file = readConfigFile(dataDir);
+  if (value === "") {
+    delete file[key];
+  } else if (key === "port") {
+    const port = Number(value);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`invalid port: ${value}`);
+    file.port = port;
+  } else {
+    file[key] = value;
+  }
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(configFilePath(dataDir), JSON.stringify(file, null, 2) + "\n");
+  return file;
+}
+
 function readConfigFile(dataDir: string): ConfigFile {
   try {
     return JSON.parse(fs.readFileSync(path.join(dataDir, "config.json"), "utf8")) as ConfigFile;
