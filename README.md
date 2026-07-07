@@ -153,6 +153,6 @@ npm start         # HTTP server
 npm run build     # tsc -> dist/
 ```
 
-Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. Requires **Node ≥ 22.18** (type stripping + built-in `node:sqlite`).
+Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. The published package runs on **Node ≥ 22.5** (built-in `node:sqlite`); developing needs **Node ≥ 22.18** (type stripping).
 
 MIT.
