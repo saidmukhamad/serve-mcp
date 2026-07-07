@@ -1,6 +1,6 @@
 {
   "name": "@saidmukhamad/serve-mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Local MCP-controlled artifact shelf: agents publish HTML, Markdown, folders and files; humans get nice preview URLs.",
   "keywords": [
     "mcp",
@@ -11,6 +11,14 @@
   ],
   "license": "MIT",
   "author": "saidmukhamad",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saidmukhamad/serve-mcp.git"
+  },
+  "homepage": "https://github.com/saidmukhamad/serve-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/saidmukhamad/serve-mcp/issues"
+  },
   "type": "module",
   "bin": {
     "serve-mcp": "dist/bin/serve-mcp.js"

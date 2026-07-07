@@ -2,9 +2,9 @@
 
 A local, MCP-controlled **artifact shelf**. Your AI agents publish the HTML, Markdown, folders, CSV, and JSON they generate; you get stable, safely-rendered browser URLs to look at them. Built for a machine running several agents at once: each agent gets its own MCP process, and they all publish to one shared shelf.
 
-![The shelf gallery — cards with git provenance, tags, and a per-item menu](docs/gallery.png)
+![The shelf gallery — cards with git provenance, tags, and a per-item menu](https://raw.githubusercontent.com/saidmukhamad/serve-mcp/main/docs/gallery.png)
 
-![A rendered markdown report with a provenance subbar](docs/preview-markdown.png)
+![A rendered markdown report with a provenance subbar](https://raw.githubusercontent.com/saidmukhamad/serve-mcp/main/docs/preview-markdown.png)
 
 ## Quickstart
 
