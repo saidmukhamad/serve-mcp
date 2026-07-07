@@ -9,13 +9,13 @@ A local, MCP-controlled **artifact shelf**. Your AI agents publish the HTML, Mar
 ## Quickstart
 
 ```bash
-npm install -g serve-mcp
+npm install -g @saidmukhamad/serve-mcp
 ```
 
 Add it to Claude Code (it speaks MCP on stdio **and** serves the HTTP shelf):
 
 ```bash
-claude mcp add serve-mcp -- npx -y serve-mcp mcp
+claude mcp add serve-mcp -- npx -y @saidmukhamad/serve-mcp mcp
 ```
 
 That's it. Ask an agent to publish something and open the URL it returns.

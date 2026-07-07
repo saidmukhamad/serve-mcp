@@ -1,5 +1,5 @@
 {
-  "name": "serve-mcp",
+  "name": "@saidmukhamad/serve-mcp",
   "version": "0.0.1",
   "description": "Local MCP-controlled artifact shelf: agents publish HTML, Markdown, folders and files; humans get nice preview URLs.",
   "keywords": [
@@ -21,6 +21,9 @@
   ],
   "engines": {
     "node": ">=22.18.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "start": "node bin/serve-mcp.ts serve",
