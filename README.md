@@ -94,10 +94,11 @@ DELETE /api/publications/:slug   remove a publication and all its revisions
 
 ## Tailscale / LAN access
 
-To reach the shelf from other machines, set the bind host in the shelf's config file (`~/.local/share/serve-mcp/config.json`):
+To reach the shelf from other machines:
 
-```json
-{ "host": "0.0.0.0", "port": 7331 }
+```bash
+serve-mcp config host 0.0.0.0
+serve-mcp config port 7331
 ```
 
 Advertised URLs then pick the best reachable name automatically: MagicDNS name (learned via reverse DNS through Quad100 and verified with the system resolver, so it's only used when peers can actually resolve it) → Tailscale IP (`100.64.0.0/10`) → first LAN address. Tailnet detection needs no Tailscale tooling — it keys off the interface's CGNAT address and Tailscale's ULA prefix.
@@ -105,6 +106,8 @@ Advertised URLs then pick the best reachable name automatically: MagicDNS name (
 ## CLI
 
 ```bash
+serve-mcp                                        # status: running shelf + what's on it
+serve-mcp config host 0.0.0.0                    # set config (host, port, baseUrl)
 serve-mcp serve                                  # HTTP shelf only
 serve-mcp publish ./report.md --title "Report"   # publish without an agent
 serve-mcp list                                   # (also discovers a running shelf)
@@ -112,7 +115,7 @@ serve-mcp list                                   # (also discovers a running she
 
 ## Config
 
-`<dataDir>/config.json` (default `~/.local/share/serve-mcp/config.json`), everything optional:
+`serve-mcp config` shows it, `serve-mcp config <key> <value>` sets it (empty value unsets). Stored in `<dataDir>/config.json` (default `~/.local/share/serve-mcp/config.json`), everything optional:
 
 ```json
 {
