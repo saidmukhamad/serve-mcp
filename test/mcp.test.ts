@@ -79,6 +79,29 @@ test("artifact_publish + artifact_list + resources round trip", async () => {
   cleanup();
 });
 
+test("artifact_delete removes publication, revisions, and files", async () => {
+  const { client, store, cleanup } = await connect();
+  const pub = await client.callTool({
+    name: "artifact_publish",
+    arguments: { source: { type: "content", filename: "gone.md", content: "# g" }, slug: "gone" },
+  });
+  const artifactId = (pub.structuredContent as { artifact: { id: string } }).artifact.id;
+  assert.ok(fs.existsSync(store.dirFor(artifactId)));
+
+  const del = await client.callTool({ name: "artifact_delete", arguments: { slug: "gone" } });
+  assert.equal(del.isError ?? false, false);
+  assert.match((del.content as { text: string }[])[0]!.text, /Deleted "gone" \(1 revision\)/);
+  assert.equal(fs.existsSync(store.dirFor(artifactId)), false);
+
+  const list = await client.callTool({ name: "artifact_list", arguments: {} });
+  assert.match((list.content as { text: string }[])[0]!.text, /shelf is empty/);
+
+  const missing = await client.callTool({ name: "artifact_delete", arguments: { slug: "gone" } });
+  assert.equal(missing.isError, true);
+  await client.close();
+  cleanup();
+});
+
 test("publish from a real file path", async () => {
   const { client, dataDir, cleanup } = await connect();
   const file = path.join(dataDir, "work.html");

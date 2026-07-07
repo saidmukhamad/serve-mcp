@@ -79,6 +79,8 @@ export interface Config {
   baseUrl: string | null;
   /** true when SERVE_MCP_BASE_URL (or an override) pinned the URL. */
   baseUrlExplicit: boolean;
+  /** Roots that path/folder publishing may read from; undefined = anywhere readable. */
+  allowedRoots?: string[];
 }
 
 export interface Rendered {

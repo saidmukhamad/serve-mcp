@@ -4,9 +4,7 @@ A local, MCP-controlled **artifact shelf**. Your AI agents publish the HTML, Mar
 
 ![The shelf gallery — cards with git provenance, tags, and a per-item menu](docs/gallery.png)
 
-| Markdown report, rendered | CSV as a table |
-| --- | --- |
-| ![A rendered markdown report with a provenance subbar](docs/preview-markdown.png) | ![CSV rendered as an HTML table](docs/preview-csv.png) |
+![A rendered markdown report with a provenance subbar](docs/preview-markdown.png)
 
 ## Quickstart
 
@@ -31,7 +29,7 @@ Registry = SQLite          (stable publications -> immutable revisions)
 Store = snapshots          (nothing is served live from your workspace)
 ```
 
-## The two tools
+## The tools
 
 ### `artifact_publish`
 
@@ -51,6 +49,10 @@ Returns the preview URL, a raw URL, an MCP `resource_link`, and structured `arti
 ### `artifact_list`
 
 Filter by `query`, `tags`, `kind`; paginate with `cursor`; order by `createdAt | updatedAt | title`.
+
+### `artifact_delete`
+
+Remove a publication by `slug` — all revisions and stored files go with it. Irreversible.
 
 ### Resources
 
@@ -92,24 +94,13 @@ DELETE /api/publications/:slug   remove a publication and all its revisions
 
 ## Tailscale / LAN access
 
-To reach the shelf from other machines, bind all interfaces:
+To reach the shelf from other machines, set the bind host in the shelf's config file (`~/.local/share/serve-mcp/config.json`):
 
-```bash
-serve-mcp serve --host 0.0.0.0 --port 7331
+```json
+{ "host": "0.0.0.0", "port": 7331 }
 ```
 
 Advertised URLs then pick the best reachable name automatically: MagicDNS name (learned via reverse DNS through Quad100 and verified with the system resolver, so it's only used when peers can actually resolve it) → Tailscale IP (`100.64.0.0/10`) → first LAN address. Tailnet detection needs no Tailscale tooling — it keys off the interface's CGNAT address and Tailscale's ULA prefix.
-
-## MCP over HTTP (experimental)
-
-The shelf also speaks MCP at `<baseUrl>/mcp` (Streamable HTTP transport, stateless). Combined with `--host 0.0.0.0`, agents on *other* machines can use this shelf directly:
-
-```bash
-# on machine B, pointing at machine A's shelf over the tailnet
-claude mcp add shelf-a --transport http http://100.x.y.z:7331/mcp
-```
-
-Run a shelf on each machine and point them at each other for bidirectional publishing. Caveat: `path`/`folder` sources are read from the filesystem of the machine *running* the shelf, so remote publishers should use `content` sources.
 
 ## CLI
 
@@ -121,17 +112,23 @@ serve-mcp list                                   # (also discovers a running she
 
 ## Config
 
-All optional:
+`<dataDir>/config.json` (default `~/.local/share/serve-mcp/config.json`), everything optional:
 
-```txt
-SERVE_MCP_HOST           bind host, default 127.0.0.1 (0.0.0.0 for LAN/Tailscale)
-SERVE_MCP_PORT           fixed port; unset = ephemeral + discovery via server.json
-SERVE_MCP_BASE_URL       advertised-URL override (e.g. a MagicDNS name)
-SERVE_MCP_DATA_DIR       default ~/.local/share/serve-mcp
-SERVE_MCP_ALLOWED_ROOTS  colon-separated roots for path/folder publishing (default: anywhere readable)
+```json
+{
+  "host": "0.0.0.0",
+  "port": 7331,
+  "baseUrl": "http://my-machine.tailnet.ts.net:7331",
+  "allowedRoots": ["~/projects", "/srv/artifacts"]
+}
 ```
 
-`--port` and `--host` flags on `serve` / `mcp` override the environment.
+- `host` — bind host, default `127.0.0.1`
+- `port` — fixed port; omit for an ephemeral port + discovery via `server.json`
+- `baseUrl` — advertised-URL override (e.g. a MagicDNS name)
+- `allowedRoots` — restrict where `path`/`folder` publishing may read from (default: anywhere readable)
+
+Env vars (`SERVE_MCP_HOST`, `SERVE_MCP_PORT`, `SERVE_MCP_BASE_URL`, `SERVE_MCP_DATA_DIR`, `SERVE_MCP_ALLOWED_ROOTS`) override the file; `--host`/`--port` flags override both.
 
 ## Development
 
@@ -143,9 +140,5 @@ npm run build     # tsc -> dist/
 ```
 
 Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. Requires **Node ≥ 22.18** (type stripping + built-in `node:sqlite`).
-
-## Non-goals
-
-Not a CDN, not a deploy platform, not a filesystem browser, not a CMS. It does one thing: **publish generated artifacts → render safely → remember them → list them.**
 
 MIT.

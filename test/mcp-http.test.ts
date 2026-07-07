@@ -17,7 +17,7 @@ test("MCP over HTTP: remote client publishes and reads via /mcp", async () => {
   const tools = await client.listTools();
   assert.deepEqual(
     tools.tools.map((t) => t.name).sort(),
-    ["artifact_list", "artifact_publish"]
+    ["artifact_delete", "artifact_list", "artifact_publish"]
   );
 
   const pub = await client.callTool({

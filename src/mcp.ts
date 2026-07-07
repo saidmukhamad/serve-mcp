@@ -86,11 +86,10 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       inputSchema: publishInput,
     },
     async (input) => {
-      const allowedRoots = process.env.SERVE_MCP_ALLOWED_ROOTS?.split(":").filter(Boolean);
       const source = input.source;
       let ingested;
       try {
-        ingested = store.ingest(source, allowedRoots);
+        ingested = store.ingest(source, config.allowedRoots);
       } catch (err) {
         return errorResult(`Failed to ingest source: ${(err as Error).message}`);
       }
@@ -158,6 +157,33 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],
         structuredContent: { publications: decorated, nextCursor },
+      };
+    }
+  );
+
+  mcp.registerTool(
+    "artifact_delete",
+    {
+      title: "Delete publication",
+      description:
+        "Remove a publication and ALL of its revisions from the shelf, including stored files. Irreversible.",
+      inputSchema: {
+        slug: z.string().describe("Publication slug (or publication id) to delete"),
+      },
+    },
+    async ({ slug }) => {
+      const pub = registry.getPublication(slug);
+      if (!pub) return errorResult(`publication not found: ${slug}`);
+      const ids = registry.deletePublication(pub.id) ?? [];
+      for (const id of ids) store.remove(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Deleted "${pub.slug}" (${ids.length} revision${ids.length === 1 ? "" : "s"})`,
+          },
+        ],
+        structuredContent: { deleted: pub.slug, revisions: ids.length },
       };
     }
   );

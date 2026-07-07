@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { detectTailnetIPv4 } from "./tailnet.ts";
@@ -8,26 +9,58 @@ export interface ConfigOverrides {
   port?: number | string;
   dataDir?: string;
   baseUrl?: string;
+  allowedRoots?: string[];
 }
 
+interface ConfigFile {
+  host?: string;
+  port?: number | string;
+  baseUrl?: string;
+  allowedRoots?: string[];
+}
+
+/**
+ * Precedence: CLI flags > env vars > <dataDir>/config.json > defaults.
+ * The file is the intended home for a permanent setup (e.g. tailnet binding);
+ * flags and env are one-off overrides.
+ */
 export function loadConfig(overrides: ConfigOverrides = {}): Config {
-  const host = overrides.host ?? process.env.SERVE_MCP_HOST ?? "127.0.0.1";
-  const portRaw = overrides.port ?? process.env.SERVE_MCP_PORT;
+  const dataDir = expandHome(
+    overrides.dataDir ?? process.env.SERVE_MCP_DATA_DIR ?? "~/.local/share/serve-mcp"
+  );
+  const file = readConfigFile(dataDir);
+
+  const host = overrides.host ?? process.env.SERVE_MCP_HOST ?? file.host ?? "127.0.0.1";
+  const portRaw = overrides.port ?? process.env.SERVE_MCP_PORT ?? file.port;
   const port = portRaw === undefined || portRaw === "" ? null : Number(portRaw);
   if (port !== null && (!Number.isInteger(port) || port < 0 || port > 65535)) {
     throw new Error(`invalid port: ${portRaw}`);
   }
-  const dataDir = expandHome(
-    overrides.dataDir ?? process.env.SERVE_MCP_DATA_DIR ?? "~/.local/share/serve-mcp"
-  );
-  const explicit = overrides.baseUrl ?? process.env.SERVE_MCP_BASE_URL;
+  const explicit = overrides.baseUrl ?? process.env.SERVE_MCP_BASE_URL ?? file.baseUrl;
+  const allowedRoots =
+    overrides.allowedRoots ??
+    process.env.SERVE_MCP_ALLOWED_ROOTS?.split(":").filter(Boolean) ??
+    file.allowedRoots;
+
   return {
     host,
     port,
     dataDir,
     baseUrl: explicit ?? (port ? `http://${advertiseHost(host)}:${port}` : null),
     baseUrlExplicit: Boolean(explicit),
+    allowedRoots: allowedRoots?.map(expandHome),
   };
+}
+
+function readConfigFile(dataDir: string): ConfigFile {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dataDir, "config.json"), "utf8")) as ConfigFile;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error(`[serve-mcp] ignoring unreadable config.json: ${(err as Error).message}`);
+    }
+    return {};
+  }
 }
 
 export function baseUrlOf(config: Config): string {

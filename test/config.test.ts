@@ -19,6 +19,34 @@ test("loadConfig: explicit port builds baseUrl, no port means ephemeral", () => 
   assert.throws(() => loadConfig({ dataDir: "/tmp/x", port: 70000 }));
 });
 
+test("loadConfig: config.json in dataDir applies, env and flags override it", () => {
+  const dataDir = fs.mkdtempSync("/tmp/serve-mcp-cfg-");
+  fs.writeFileSync(
+    `${dataDir}/config.json`,
+    JSON.stringify({ host: "0.0.0.0", port: 7444, allowedRoots: ["/srv/artifacts"] })
+  );
+
+  const fromFile = loadConfig({ dataDir });
+  assert.equal(fromFile.host, "0.0.0.0");
+  assert.equal(fromFile.port, 7444);
+  assert.deepEqual(fromFile.allowedRoots, ["/srv/artifacts"]);
+
+  const flagWins = loadConfig({ dataDir, host: "127.0.0.1", port: 9000 });
+  assert.equal(flagWins.host, "127.0.0.1");
+  assert.equal(flagWins.port, 9000);
+
+  process.env.SERVE_MCP_HOST = "192.168.1.5";
+  try {
+    assert.equal(loadConfig({ dataDir }).host, "192.168.1.5", "env beats file");
+  } finally {
+    delete process.env.SERVE_MCP_HOST;
+  }
+
+  fs.writeFileSync(`${dataDir}/config.json`, "not json{");
+  assert.equal(loadConfig({ dataDir }).host, "127.0.0.1", "broken file falls back to defaults");
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
 test("advertiseHost: loopback passes through, wildcard resolves to a real address", () => {
   assert.equal(advertiseHost("127.0.0.1"), "127.0.0.1");
   assert.equal(advertiseHost("myhost.ts.net"), "myhost.ts.net");
