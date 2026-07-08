@@ -4,8 +4,12 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-07-08
+
 ### Added
 - Dev builds identify as `<version>-dev.<commit>` — `serve-mcp --version` and the MCP handshake include the commit when running from a checkout; CI publishes the same shape to the npm `dev` tag.
+- `/healthz` reports the running version.
+- README: the permanent setup (always-on service) moved to the top.
 
 ## [0.0.6] - 2026-07-08
 
