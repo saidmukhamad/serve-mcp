@@ -26,7 +26,10 @@ export function cspFor(artifact: RendererCarrier): string {
 
 // Popups escape the sandbox so external links can open in a real tab
 // (framed navigation is refused by most sites); scripts stay opt-in.
-const SANDBOX_BASE = "allow-downloads allow-popups allow-popups-to-escape-sandbox";
+// Top navigation (click-gated) lets folder listings move the address bar
+// so reload keeps the place.
+const SANDBOX_BASE =
+  "allow-downloads allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation";
 
 export function sandboxFor(artifact: RendererCarrier): string {
   return allowsScripts(artifact) ? `${SANDBOX_BASE} allow-scripts` : SANDBOX_BASE;

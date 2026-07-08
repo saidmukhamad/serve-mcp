@@ -74,12 +74,25 @@ export function createApp({ registry, store, config }: Deps): Hono {
     return c.html(shellPage(pub, artifact, base(), shellSandbox(artifact)));
   });
 
+  // Deep link into a served folder: reload/share keeps the place you navigated to.
+  app.get("/p/:slug/f/*", (c) => {
+    const pub = registry.getPublication(c.req.param("slug"));
+    if (!pub) return c.text("publication not found", 404);
+    const artifact = registry.getArtifact(pub.latestArtifactId)!;
+    if (artifact.kind !== "static-folder") return c.redirect(`/p/${pub.slug}`);
+    const rawRel = c.req.path.split("/").slice(4).join("/");
+    const rel = decodeURIComponent(rawRel);
+    if (!store.statFolderPath(artifact.id, rel === "" ? "." : rel)) return c.text("not found", 404);
+    c.header("Content-Security-Policy", SHELL_CSP);
+    return c.html(shellPage(pub, artifact, base(), shellSandbox(artifact), { subpath: rawRel }));
+  });
+
   app.get("/p/:slug/r/:artifactId", (c) => {
     const pub = registry.getPublication(c.req.param("slug"));
     const artifact = registry.getArtifact(c.req.param("artifactId"));
     if (!pub || !artifact || artifact.publicationId !== pub.id) return c.text("revision not found", 404);
     c.header("Content-Security-Policy", SHELL_CSP);
-    return c.html(shellPage(pub, artifact, base(), shellSandbox(artifact), true));
+    return c.html(shellPage(pub, artifact, base(), shellSandbox(artifact), { isRevision: true }));
   });
 
   app.get("/frame/:artifactId", async (c) => {
@@ -114,9 +127,10 @@ export function createApp({ registry, store, config }: Deps): Hono {
           return serveFolderFile(c, candidate);
         }
       }
+      const owner = registry.getPublication(artifact.publicationId);
       const { body, contentType } = docShell(
         artifact.title,
-        listingHtml(rel, store.listFolder(artifact.id, rel === "" ? "." : rel))
+        listingHtml(rel, store.listFolder(artifact.id, rel === "" ? "." : rel), owner ? `/p/${owner.slug}/f` : undefined)
       );
       return send(c, body, contentType);
     }
@@ -341,13 +355,29 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function listingHtml(rel: string, entries: { name: string; isDir: boolean; sizeBytes: number }[]): string {
-  const up = rel === "" || rel === "/" ? "" : `<li><a href="../">../</a></li>`;
+// With topBase (/p/<slug>/f) links navigate the top window, so the address bar
+// tracks the folder position and reload/share lands on the same place.
+function listingHtml(
+  rel: string,
+  entries: { name: string; isDir: boolean; sizeBytes: number }[],
+  topBase?: string
+): string {
+  const prefix = rel === "" || rel === "/" ? "" : rel.endsWith("/") ? rel : `${rel}/`;
+  const link = (href: string, label: string) =>
+    topBase !== undefined
+      ? `<a target="_top" href="${escapeHtml(href)}">${label}</a>`
+      : `<a href="${escapeHtml(href)}">${label}</a>`;
+  const parent = prefix.replace(/[^/]+\/$/, "");
+  const up =
+    prefix === ""
+      ? ""
+      : `<li>${link(topBase !== undefined ? `${topBase}/${parent}` : "../", "../")}</li>`;
   const items = entries
     .map((e) => {
-      const href = encodeURIComponent(e.name) + (e.isDir ? "/" : "");
+      const segment = encodeURIComponent(e.name) + (e.isDir ? "/" : "");
+      const href = topBase !== undefined ? `${topBase}/${prefix}${segment}` : segment;
       const size = e.isDir ? "" : `<span class="size">${formatSize(e.sizeBytes)}</span>`;
-      return `<li>${size}<a href="${href}">${escapeHtml(e.name)}${e.isDir ? "/" : ""}</a></li>`;
+      return `<li>${size}${link(href, `${escapeHtml(e.name)}${e.isDir ? "/" : ""}`)}</li>`;
     })
     .join("\n");
   return `<ul class="listing">${up}${items}</ul>`;
@@ -410,16 +440,25 @@ function galleryPage(pubs: Publication[], q?: string): string {
   return page("serve-mcp · artifact shelf", body);
 }
 
-function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, sandbox: string, isRevision = false): string {
+function shellPage(
+  pub: Publication,
+  artifact: Artifact,
+  baseUrl: string,
+  sandbox: string,
+  opts: { isRevision?: boolean; subpath?: string } = {}
+): string {
   const frameSrc =
-    artifact.kind === "static-folder" ? `/frame/${artifact.id}/` : `/frame/${artifact.id}`;
-  const revNote = isRevision
+    artifact.kind === "static-folder"
+      ? `/frame/${artifact.id}/${opts.subpath ?? ""}`
+      : `/frame/${artifact.id}`;
+  const revNote = opts.isRevision
     ? `<span class="badge">revision ${pub.revisions.indexOf(artifact.id) + 1}/${pub.revisions.length}</span>`
     : "";
   const revLinks = pub.revisions
     .map((id, i) => `<a href="/p/${escapeHtml(pub.slug)}/r/${escapeHtml(id)}">r${i + 1}</a>`)
     .join(" · ");
   const subBits = [
+    opts.subpath ? `<code>/${escapeHtml(decodeURIComponent(opts.subpath))}</code>` : "",
     pub.description ? escapeHtml(pub.description) : "",
     ...provenanceBits(artifact.context),
   ].filter(Boolean);
@@ -437,6 +476,6 @@ function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, sandbo
     <button class="btn" onclick="navigator.clipboard.writeText('${escapeHtml(baseUrl)}/p/${escapeHtml(pub.slug)}').then(()=>{this.textContent='Copied';setTimeout(()=>this.textContent='Copy URL',1200)})">Copy URL</button>
   </header>
   ${subBits.length ? `<div class="subbar">${subBits.join(" · ")}</div>` : ""}
-  <iframe class="preview" sandbox="${sandbox}" src="${frameSrc}"></iframe>`;
+  <iframe class="preview" sandbox="${sandbox}" src="${escapeHtml(frameSrc)}"></iframe>`;
   return page(pub.title, body, 'class="shell"');
 }

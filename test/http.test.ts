@@ -239,8 +239,23 @@ test("folder navigation: per-dir indexes, dir redirect, ../ listing links", asyn
   const listing = await get(`/frame/${ing.id}/assets/`);
   assert.equal(listing.status, 200);
   const listingHtml = await listing.text();
-  assert.match(listingHtml, /href="\.\.\/">\.\.\//, "listing has ../ link");
-  assert.match(listingHtml, /chart\.csv/);
+  assert.match(
+    listingHtml,
+    /<a target="_top" href="\/p\/docs\/f\/">\.\.\//,
+    "listing ../ deep-links the top window so the address bar tracks position"
+  );
+  assert.match(
+    listingHtml,
+    /<a target="_top" href="\/p\/docs\/f\/assets\/chart\.csv">chart\.csv/,
+    "listing entries deep-link through the shell"
+  );
+
+  const deep = await get(`/p/docs/f/assets/`);
+  assert.equal(deep.status, 200, "folder deep link reloads to the same place");
+  const deepHtml = await deep.text();
+  assert.match(deepHtml, new RegExp(`src="/frame/${ing.id}/assets/"`), "shell frames the deep path");
+  assert.match(deepHtml, /<code>\/assets\/<\/code>/, "subbar shows the folder position");
+  assert.equal((await get(`/p/docs/f/nope.md`)).status, 404);
   cleanup();
 });
 
