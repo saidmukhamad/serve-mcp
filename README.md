@@ -88,13 +88,25 @@ GET    /api/publications         JSON list (query, cursor, limit)
 DELETE /api/publications/:slug   remove a publication and all its revisions
 ```
 
-## Always-on shelf
+## Lifecycle: who keeps the shelf alive
 
-The shelf normally lives as long as some MCP session is running (the first one starts it). To keep it up permanently — one server every agent and human on the machine works against:
+A shelf runs in one of three modes:
+
+1. **Session-managed** (default) — the first MCP session on the machine becomes the shelf as a side effect and it lives as long as that session; the next session takes over. Zero setup, but the shelf has gaps when no session is open, and the URL changes unless you set a fixed port.
+2. **Foreground** — `serve-mcp serve` in a terminal. Ctrl-C kills it, nothing respawns it.
+3. **Service-managed** (recommended) — the OS supervises it: starts at login, restarts on crash, independent of any session or terminal.
+
+`serve-mcp` shows which one is running; `serve-mcp restart` (alias `apply`) restarts it — through the supervisor when the service is installed, by pid otherwise.
+
+### The permanent setup
+
+One always-on server that every agent and human on the machine works against:
 
 ```bash
-serve-mcp config port 7331     # fixed port, stable URLs
-serve-mcp service install      # launchd on macOS, systemd --user on Linux
+serve-mcp config host 0.0.0.0    # reachable over your tailnet/LAN (skip for localhost-only)
+serve-mcp config port 7331       # fixed port, stable URLs
+serve-mcp service install        # launchd / systemd --user / Task Scheduler
+loginctl enable-linger $USER     # Linux only: keep it alive after you log out
 ```
 
 Manage it with `serve-mcp service start|stop|restart|status|logs|uninstall`. Everything is user-level — no root/admin:
@@ -107,14 +119,7 @@ The service pins the current runtime and package paths (shown on install) — re
 
 ## Tailscale / LAN access
 
-To reach the shelf from other machines:
-
-```bash
-serve-mcp config host 0.0.0.0
-serve-mcp config port 7331
-```
-
-Advertised URLs then pick the best reachable name automatically: MagicDNS name (learned via reverse DNS through Quad100 and verified with the system resolver, so it's only used when peers can actually resolve it) → Tailscale IP (`100.64.0.0/10`) → first LAN address. Tailnet detection needs no Tailscale tooling — it keys off the interface's CGNAT address and Tailscale's ULA prefix.
+To reach the shelf from other machines, set `host` to `0.0.0.0` (the permanent setup above does this). Advertised URLs then pick the best reachable name automatically: MagicDNS name (learned via reverse DNS through Quad100 and verified with the system resolver, so it's only used when peers can actually resolve it) → Tailscale IP (`100.64.0.0/10`) → first LAN address. Tailnet detection needs no Tailscale tooling — it keys off the interface's CGNAT address and Tailscale's ULA prefix.
 
 ## CLI
 
