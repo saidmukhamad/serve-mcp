@@ -5,6 +5,11 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 ### Added
+- Dev builds identify as `<version>-dev.<commit>` — `serve-mcp --version` and the MCP handshake include the commit when running from a checkout; CI publishes the same shape to the npm `dev` tag.
+
+## [0.0.6] - 2026-07-08
+
+### Added
 - Live publications: path/folder sources serve straight from the workspace via symlink — edits show on refresh. **Live is the default**; `live: false` (CLI `--snapshot`) freezes an immutable copy. Gallery and preview show a `live` badge.
 - `serve-mcp restart` (alias `apply`) — restarts the shelf wherever it lives: through the service manager when installed, by pid otherwise. `config` now points at it after writing.
 - This changelog.

@@ -1,10 +1,11 @@
 import { createRequire } from "node:module";
+import path from "node:path";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { KINDS } from "./types.ts";
 import { artifactWithUrls, publicationWithUrls, type Registry } from "./registry.ts";
 import { baseUrlOf } from "./config.ts";
-import { captureContext } from "./provenance.ts";
+import { captureContext, readGitInfo } from "./provenance.ts";
 import type { ArtifactStore } from "./store.ts";
 import type { Config } from "./types.ts";
 
@@ -86,11 +87,17 @@ const INSTRUCTIONS =
   "Republish with the same slug and updateExisting:true to update a page at a stable URL. " +
   "artifact_list shows what is already on the shelf.";
 
+// Dev builds identify as <version>.<commit> — matches what CI publishes to the dev tag.
 export function packageVersion(): string {
   const require = createRequire(import.meta.url);
   for (const p of ["../package.json", "../../package.json"]) {
     try {
-      return (require(p) as { version: string }).version;
+      const version = (require(p) as { version: string }).version;
+      if (version.endsWith("-dev")) {
+        const commit = readGitInfo(path.dirname(require.resolve(p)))?.commit?.slice(0, 7);
+        if (commit) return `${version}.${commit}`;
+      }
+      return version;
     } catch {}
   }
   return "0.0.0";
