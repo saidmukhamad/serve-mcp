@@ -4,11 +4,13 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
-## [0.0.5] - 2026-07-08
-
 ### Added
 - `serve-mcp restart` (alias `apply`) — restarts the shelf wherever it lives: through the service manager when installed, by pid otherwise. `config` now points at it after writing.
 - This changelog.
+
+### Changed
+- README: lifecycle section (three modes + permanent setup recipe), trimmed Rendering & safety.
+- Dev convention: `-dev` version suffix between releases; conventional commit prefixes.
 
 ## [0.0.4] - 2026-07-08
 
