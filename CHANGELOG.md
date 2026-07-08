@@ -4,7 +4,7 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
-## [0.0.7] - 2026-07-08
+## [0.0.8] - 2026-07-08
 
 ### Fixed
 - Only one server, guaranteed: simultaneous ephemeral-mode sessions now elect a single shelf via a start lock (fixed ports already had the OS bind as their lock), and `serve-mcp serve` refuses to start next to a running shelf.
@@ -12,6 +12,10 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ### Added
 - Proactive publishing: MCP instructions and the `artifact_publish` description now tell agents to publish viewable output without being asked; `skills/publish-artifact/SKILL.md` ships as an auto-triggering Claude Code skill (copy to `~/.claude/skills/`).
+
+## [0.0.7] - 2026-07-08
+
+### Added
 - Dev builds identify as `<version>-dev.<commit>` — `serve-mcp --version` and the MCP handshake include the commit when running from a checkout; CI publishes the same shape to the npm `dev` tag.
 - `/healthz` reports the running version.
 - README: the permanent setup (always-on service) moved to the top.
