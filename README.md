@@ -152,10 +152,12 @@ To reach the shelf from other machines, set `host` to `0.0.0.0` (the permanent s
 ## CLI
 
 ```bash
+serve-mcp ./report.md                            # publish anything, get its URL
+serve-mcp .                                      # serve this directory, live
 serve-mcp                                        # status: running shelf + what's on it
 serve-mcp config host 0.0.0.0                    # set config (host, port, baseUrl)
 serve-mcp serve                                  # HTTP shelf only
-serve-mcp publish ./report.md --title "Report"   # publish without an agent
+serve-mcp publish ./report.md --title "Report"   # the longhand, with options
 serve-mcp list                                   # (also discovers a running shelf)
 ```
 

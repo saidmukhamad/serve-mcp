@@ -4,6 +4,9 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- Bare-path shorthand: `serve-mcp ./report.md` publishes and prints the URL; `serve-mcp .` serves the current directory, live.
+
 ## [0.0.8] - 2026-07-08
 
 ### Fixed

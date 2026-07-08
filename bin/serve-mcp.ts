@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import "../src/quiet.ts";
+import fs from "node:fs";
 import { parseArgs } from "node:util";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig, configFilePath, setConfigValue, CONFIG_KEYS, type ConfigKey } from "../src/config.ts";
@@ -24,6 +25,8 @@ const USAGE = `serve-mcp — local MCP-controlled artifact shelf
 
 Usage:
   serve-mcp                                   show shelf status and publications
+  serve-mcp <path> [opts]                     publish a file/folder and print its URL
+                                              ("serve-mcp ." serves this directory, live)
   serve-mcp config [<key> [<value>]]          show or set config (host, port, baseUrl)
   serve-mcp restart                           restart the shelf / apply config changes
                                               (alias: apply)
@@ -53,8 +56,17 @@ Env:
   SERVE_MCP_ALLOWED_ROOTS (colon-separated publish roots)
 `;
 
-const [cmdArg, ...rest] = process.argv.slice(2);
-const cmd = cmdArg ?? (process.stdin.isTTY ? "status" : "mcp");
+let [cmdArg, ...rest] = process.argv.slice(2);
+let cmd = cmdArg ?? (process.stdin.isTTY ? "status" : "mcp");
+const COMMANDS = new Set([
+  "mcp", "serve", "publish", "list", "status", "service", "config",
+  "restart", "apply", "version", "--version", "-v", "help", "--help",
+]);
+// `serve-mcp ./report.md` / `serve-mcp .` — a bare path publishes it.
+if (cmdArg && !COMMANDS.has(cmdArg) && fs.existsSync(cmdArg)) {
+  rest = [cmdArg, ...rest];
+  cmd = "publish";
+}
 
 function serverFlags(args: string[]) {
   const { values } = parseArgs({
