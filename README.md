@@ -12,13 +12,30 @@ A local, MCP-controlled **artifact shelf**. Your AI agents publish the HTML, Mar
 npm install -g @saidmukhamad/serve-mcp
 ```
 
-Add it to Claude Code (it speaks MCP on stdio **and** serves the HTTP shelf):
+Add it to whatever agents you run — they all publish into the **same shelf** (the first process starts the HTTP server, the rest find it):
 
 ```bash
+# Claude Code
 claude mcp add serve-mcp -- npx -y @saidmukhamad/serve-mcp mcp
+
+# Codex
+codex mcp add serve-mcp -- npx -y @saidmukhamad/serve-mcp mcp
+
+# Gemini CLI
+gemini mcp add serve-mcp npx -y @saidmukhamad/serve-mcp mcp
 ```
 
-That's it. Ask an agent to publish something and open the URL it returns.
+Anything else that speaks MCP (Cursor, Windsurf, ...) — the usual `mcpServers` block:
+
+```json
+{
+  "mcpServers": {
+    "serve-mcp": { "command": "npx", "args": ["-y", "@saidmukhamad/serve-mcp", "mcp"] }
+  }
+}
+```
+
+That's it. Ask any agent to publish something and open the URL it returns — one gallery for everything, whoever made it.
 
 ## How it works
 
