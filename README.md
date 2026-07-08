@@ -66,10 +66,6 @@ N agents, one shelf, no coordination. The first `serve-mcp` to start binds a por
 
 Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`), so nothing is served from your workspace and revisions never change. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter, live `mermaid` diagrams); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
 
-Mermaid runs client-side but stays inside the security model: the frame's CSP allows only the shelf's own mermaid script via a per-request nonce, so script tags inside the markdown itself still never execute.
-
-Every HTML, Markdown, and SVG preview is served inside a sandboxed iframe with `Content-Security-Policy: script-src 'none'` — agent-generated content **cannot run scripts, phone home, or touch cookies**. Scripts are an explicit per-artifact opt-in (`renderer.options.allowScripts: true`), which loosens the sandbox to `allow-scripts` for that one artifact.
-
 The server binds `127.0.0.1` unless you opt into `0.0.0.0`, and there is no auth — only expose it to networks you trust (a Tailscale tailnet qualifies; the open internet does not). Restrict path publishing with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 
 ### Folder navigation
