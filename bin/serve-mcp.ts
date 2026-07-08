@@ -6,7 +6,7 @@ import { loadConfig, configFilePath, setConfigValue, CONFIG_KEYS, type ConfigKey
 import { ArtifactStore } from "../src/store.ts";
 import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry.ts";
 import { startHttp, type Deps } from "../src/http.ts";
-import { createMcpServer } from "../src/mcp.ts";
+import { createMcpServer, packageVersion } from "../src/mcp.ts";
 import { readServerInfo } from "../src/server-info.ts";
 import {
   installService,
@@ -248,6 +248,12 @@ switch (cmd) {
     }
     break;
   }
+
+  case "version":
+  case "--version":
+  case "-v":
+    console.log(packageVersion());
+    break;
 
   default:
     console.error(USAGE);

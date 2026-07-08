@@ -39,6 +39,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "npm run typecheck && node --test \"test/*.test.ts\"",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

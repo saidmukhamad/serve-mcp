@@ -1,0 +1,12 @@
+#!/bin/sh
+# Enforces conventional commit prefixes (see README "Development").
+msg=$(head -1 "$1")
+
+case "$msg" in
+  feat:*|fix:*|docs:*|refactor:*|test:*|chore:*|ci:*) exit 0 ;;
+  feat\(*\):*|fix\(*\):*|docs\(*\):*|refactor\(*\):*|test\(*\):*|chore\(*\):*|ci\(*\):*) exit 0 ;;
+  Merge*|Revert*|fixup!*|squash!*) exit 0 ;;
+esac
+
+echo "commit-msg: first line must start with feat|fix|docs|refactor|test|chore|ci (got: \"$msg\")" >&2
+exit 1

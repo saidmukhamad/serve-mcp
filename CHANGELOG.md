@@ -12,6 +12,8 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 - README: lifecycle section (three modes + permanent setup recipe), trimmed Rendering & safety.
 - Dev convention: `-dev` version suffix between releases; conventional commit prefixes.
 - CI publishes every main push as `<version>.<short-sha>` on the npm `dev` dist-tag while the version is `-dev`.
+- `serve-mcp version` / `--version` / `-v`.
+- Local `commit-msg` hook enforcing the commit prefixes (zero-dep, via `core.hooksPath`).
 
 ## [0.0.4] - 2026-07-08
 

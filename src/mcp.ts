@@ -78,7 +78,7 @@ const INSTRUCTIONS =
   "Republish with the same slug and updateExisting:true to update a page at a stable URL. " +
   "artifact_list shows what is already on the shelf.";
 
-function packageVersion(): string {
+export function packageVersion(): string {
   const require = createRequire(import.meta.url);
   for (const p of ["../package.json", "../../package.json"]) {
     try {
