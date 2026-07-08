@@ -44,6 +44,7 @@ dir, so other serve-mcp processes find the running shelf automatically.
 
 Publish options:
   --title <t>   --slug <s>   --update   --tag <t> (repeatable)
+  --live        serve from the source path (edits show); default is a snapshot
 
 Env:
   SERVE_MCP_HOST (127.0.0.1)  SERVE_MCP_PORT (ephemeral)
@@ -111,6 +112,7 @@ switch (cmd) {
         title: { type: "string" },
         slug: { type: "string" },
         update: { type: "boolean", default: false },
+        live: { type: "boolean", default: false },
         tag: { type: "string", multiple: true },
       },
     });
@@ -122,7 +124,7 @@ switch (cmd) {
     const config = loadConfig();
     const d = deps(config);
     const baseUrl = resolveBaseUrl(config);
-    const ingested = d.store.ingest({ type: "path", path: target });
+    const ingested = d.store.ingest({ type: "path", path: target }, config.allowedRoots, values.live);
     const { publication, artifact } = d.registry.publish({
       ingested,
       title: values.title,

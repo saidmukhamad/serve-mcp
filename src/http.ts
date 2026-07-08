@@ -239,6 +239,7 @@ const UI_CSS = `
   header.bar h1 { font-size: 1rem; margin: 0; font-weight: 600; }
   .badge { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 99px; text-transform: uppercase;
            letter-spacing: 0.04em; background: light-dark(#eceff4, #26262e); color: light-dark(#4a4a55, #a8a8b2); }
+  .badge.live { background: light-dark(#e7f7ec, #16281c); color: light-dark(#1a7f37, #4ec97a); }
   .muted { color: light-dark(#777782, #8b8b96); font-size: 0.85rem; }
   .spacer { flex: 1; }
   .btn { font-size: 0.82rem; padding: 0.25rem 0.7rem; border-radius: 6px; border: 1px solid light-dark(#d8d8e0, #33333c);
@@ -371,6 +372,7 @@ function galleryPage(pubs: Publication[], q?: string): string {
         ${meta ? `<div class="prov">${meta}</div>` : ""}
       </div>
       <div class="side">
+        ${p.live ? `<span class="badge live" title="serves from the source path — edits show">live</span>` : ""}
         <span class="badge">${escapeHtml(p.kind ?? "")}</span>
         <span class="muted">${p.revisions.length} rev · ${relTime(p.updatedAt)}</span>
         <details class="menu">
@@ -426,6 +428,7 @@ function shellPage(pub: Publication, artifact: Artifact, baseUrl: string, sandbo
     <a href="/" title="back to shelf">←</a>
     <h1>${escapeHtml(pub.title)}</h1>
     <span class="badge">${escapeHtml(artifact.kind)}</span>
+    ${artifact.live ? `<span class="badge live" title="serves from the source path — edits show">live</span>` : ""}
     ${revNote}
     <span class="muted">${relTime(artifact.createdAt)}</span>
     <div class="spacer"></div>

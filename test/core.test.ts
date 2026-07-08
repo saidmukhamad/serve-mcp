@@ -61,6 +61,44 @@ test("store ingests folders without entrypoint", () => {
   cleanup();
 });
 
+test("live file: edits show through, content sources rejected", () => {
+  const { store, registry, cleanup, dataDir } = makeDeps();
+  const src = path.join(dataDir, "notes.md");
+  fs.writeFileSync(src, "# v1");
+  const ing = store.ingest({ type: "path", path: src }, undefined, true);
+  assert.equal(ing.live, true);
+  assert.equal(store.readSource(ing.id, ing.filename).toString(), "# v1");
+
+  fs.writeFileSync(src, "# v2 edited");
+  assert.equal(store.readSource(ing.id, ing.filename).toString(), "# v2 edited");
+
+  const { artifact, publication } = registry.publish({ ingested: ing, title: "Notes", sourceType: "path" });
+  assert.equal(artifact.live, true);
+  const listed = registry.listPublications({}).publications.find((p) => p.id === publication.id);
+  assert.equal(listed?.live, true);
+
+  assert.throws(() => store.ingest({ type: "content", content: "x", filename: "x.md" }, undefined, true), /live mode/);
+  cleanup();
+});
+
+test("live folder: new files appear, delete removes only the link", () => {
+  const { store, cleanup, dataDir } = makeDeps();
+  const site = path.join(dataDir, "livesite");
+  fs.mkdirSync(site, { recursive: true });
+  fs.writeFileSync(path.join(site, "index.html"), "<h1>v1</h1>");
+  const ing = store.ingest({ type: "folder", path: site }, undefined, true);
+  assert.equal(ing.live, true);
+  assert.equal(ing.filename, "files/index.html");
+
+  fs.writeFileSync(path.join(site, "new.csv"), "a,b\n");
+  assert.equal(store.statFolderPath(ing.id, "new.csv")?.type, "file");
+  assert.ok(store.listFolder(ing.id, ".").some((e) => e.name === "new.csv"));
+
+  store.remove(ing.id);
+  assert.ok(fs.existsSync(path.join(site, "index.html")), "source folder must survive artifact removal");
+  cleanup();
+});
+
 test("registry publish, revisions, conflicts, listing", () => {
   const { store, registry, cleanup } = makeDeps();
   const ing1 = store.ingest({ type: "content", content: "v1", filename: "doc.md" });

@@ -43,7 +43,7 @@ That's it. Ask any agent to publish something and open the URL it returns — on
 MCP = control plane        (artifact_publish, artifact_list, resources)
 HTTP = human preview plane (gallery, /p/:slug, sandboxed previews)
 Registry = SQLite          (stable publications -> immutable revisions)
-Store = snapshots          (nothing is served live from your workspace)
+Store = snapshots          (or live: true to serve straight from the source)
 ```
 
 ## The tools
@@ -56,6 +56,7 @@ Store = snapshots          (nothing is served live from your workspace)
   "title": "Training run explanation",
   "slug": "training-run-explanation",                     // stable /p/<slug>; generated if omitted
   "updateExisting": true,                                 // add a revision; false = conflict on an existing slug
+  "live": false,                                          // true = serve from the source path, edits show on refresh
   "tags": ["ml", "report"],
   "renderer": { "options": { "allowScripts": false } }    // scripts stay off unless asked
 }
@@ -81,7 +82,7 @@ N agents, one shelf, no coordination. The first `serve-mcp` to start binds a por
 
 ## Rendering & safety
 
-Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`), so nothing is served from your workspace and revisions never change. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter, live `mermaid` diagrams); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
+Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`) by default, so nothing is served from your workspace and revisions never change. Publish with `live: true` (CLI: `--live`) to flip that for path/folder sources: the shelf serves straight from the source, edits show on refresh, and the page breaks if the source moves. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter, live `mermaid` diagrams); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
 
 The server binds `127.0.0.1` unless you opt into `0.0.0.0`, and there is no auth — only expose it to networks you trust (a Tailscale tailnet qualifies; the open internet does not). Restrict path publishing with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 

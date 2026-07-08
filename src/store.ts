@@ -21,14 +21,15 @@ export class ArtifactStore {
     return path.join(this.root, artifactId);
   }
 
-  ingest(source: Source, allowedRoots?: string[]): Ingested {
+  ingest(source: Source, allowedRoots?: string[], live = false): Ingested {
+    if (live && source.type === "content") throw new Error("live mode needs a path or folder source");
     const id = this.newId();
     const dir = this.dirFor(id);
     fs.mkdirSync(dir, { recursive: true });
     try {
       if (source.type === "content") return this.ingestContent(id, dir, source);
-      if (source.type === "path") return this.ingestPath(id, dir, source, allowedRoots);
-      return this.ingestFolder(id, dir, source, allowedRoots);
+      if (source.type === "path") return this.ingestPath(id, dir, source, allowedRoots, live);
+      return this.ingestFolder(id, dir, source, allowedRoots, live);
     } catch (err) {
       fs.rmSync(dir, { recursive: true, force: true });
       throw err;
@@ -48,14 +49,26 @@ export class ArtifactStore {
     id: string,
     dir: string,
     source: Extract<Source, { type: "path" }>,
-    allowedRoots?: string[]
+    allowedRoots?: string[],
+    live = false
   ): Ingested {
     const abs = resolveWithinRoots(source.path, allowedRoots);
     if (fs.statSync(abs).isDirectory()) {
-      return this.ingestFolder(id, dir, { type: "folder", path: source.path }, allowedRoots);
+      return this.ingestFolder(id, dir, { type: "folder", path: source.path }, allowedRoots, live);
     }
     const name = sanitizeFilename(path.basename(abs));
-    return this.ingestFile(id, dir, name, fs.readFileSync(abs), detectMime(name));
+    const buf = fs.readFileSync(abs);
+    if (live) fs.symlinkSync(abs, path.join(dir, name));
+    else fs.writeFileSync(path.join(dir, name), buf);
+    return {
+      id,
+      kind: detectKind(name),
+      mimeType: detectMime(name),
+      sha256: sha256(buf),
+      filename: name,
+      sizeBytes: buf.length,
+      live,
+    };
   }
 
   private ingestFile(id: string, dir: string, name: string, buf: Buffer, mimeType: string): Ingested {
@@ -67,6 +80,7 @@ export class ArtifactStore {
       sha256: sha256(buf),
       filename: name,
       sizeBytes: buf.length,
+      live: false,
     };
   }
 
@@ -74,24 +88,30 @@ export class ArtifactStore {
     id: string,
     dir: string,
     source: Extract<Source, { type: "folder" }>,
-    allowedRoots?: string[]
+    allowedRoots?: string[],
+    live = false
   ): Ingested {
     const abs = resolveWithinRoots(source.path, allowedRoots);
     if (!fs.statSync(abs).isDirectory()) throw new Error(`not a directory: ${source.path}`);
     const filesDir = path.join(dir, "files");
-    fs.cpSync(abs, filesDir, {
-      recursive: true,
-      dereference: false,
-      filter: (src) => !path.basename(src).startsWith(".") && !src.includes(`${path.sep}node_modules${path.sep}`),
-    });
+    if (live) {
+      fs.symlinkSync(abs, filesDir, "junction");
+    } else {
+      fs.cpSync(abs, filesDir, {
+        recursive: true,
+        dereference: false,
+        filter: (src) => !path.basename(src).startsWith(".") && !src.includes(`${path.sep}node_modules${path.sep}`),
+      });
+    }
     const entrypoint = pickEntrypoint(filesDir, source.entrypoint);
     return {
       id,
       kind: "static-folder",
       mimeType: "text/html",
-      sha256: hashTree(filesDir),
+      sha256: live ? "" : hashTree(filesDir),
       filename: entrypoint ? `files/${entrypoint}` : "files",
-      sizeBytes: treeSize(filesDir),
+      sizeBytes: live ? 0 : treeSize(filesDir),
+      live,
     };
   }
 

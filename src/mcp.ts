@@ -41,6 +41,14 @@ const publishInput = {
     .optional()
     .default(false)
     .describe("If the slug already exists, add a new revision instead of failing"),
+  live: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "Serve straight from the source path instead of snapshotting — edits show on refresh. " +
+        "path/folder sources only; the page breaks if the source moves or is deleted."
+    ),
   tags: z.array(z.string()).optional(),
   renderer: z
     .object({
@@ -109,7 +117,7 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
       const source = input.source;
       let ingested;
       try {
-        ingested = store.ingest(source, config.allowedRoots);
+        ingested = store.ingest(source, config.allowedRoots, input.live);
       } catch (err) {
         return errorResult(`Failed to ingest source: ${(err as Error).message}`);
       }

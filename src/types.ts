@@ -43,6 +43,8 @@ export interface Ingested {
   sha256: string;
   filename: string;
   sizeBytes: number;
+  /** true = served from the source path (symlinked, edits show); false = snapshot. */
+  live: boolean;
 }
 
 export interface Artifact extends Ingested {
@@ -68,6 +70,8 @@ export interface Publication {
   kind?: ArtifactKind;
   /** Context of the latest revision, when loaded via listPublications. */
   context?: SourceContext;
+  /** Whether the latest revision serves live from its source path. */
+  live?: boolean;
 }
 
 export interface Config {

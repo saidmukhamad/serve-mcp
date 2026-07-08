@@ -39,6 +39,7 @@ interface PublicationRow {
   updated_at: string;
   latest_kind?: string;
   latest_context?: string;
+  latest_live?: number;
 }
 
 interface ArtifactRow {
@@ -55,6 +56,7 @@ interface ArtifactRow {
   context_json: string | null;
   renderer_json: string;
   created_at: string;
+  live: number;
 }
 
 // WAL so several serve-mcp processes (one per agent) can share one data dir.
@@ -95,10 +97,15 @@ export class Registry {
       );
       CREATE INDEX IF NOT EXISTS idx_artifacts_pub ON artifacts(publication_id, created_at);
     `);
-    try {
-      this.db.exec(`ALTER TABLE artifacts ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`);
-    } catch {
-      // column already exists
+    for (const migration of [
+      `ALTER TABLE artifacts ADD COLUMN context_json TEXT NOT NULL DEFAULT '{}'`,
+      `ALTER TABLE artifacts ADD COLUMN live INTEGER NOT NULL DEFAULT 0`,
+    ]) {
+      try {
+        this.db.exec(migration);
+      } catch {
+        // column already exists
+      }
     }
   }
 
@@ -153,8 +160,8 @@ export class Registry {
     this.db
       .prepare(
         `INSERT INTO artifacts (id, publication_id, kind, mime_type, sha256, title, filename, size_bytes,
-         source_type, source_label, context_json, renderer_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         source_type, source_label, context_json, renderer_json, created_at, live)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         ingested.id,
@@ -169,7 +176,8 @@ export class Registry {
         sourceLabel ?? null,
         JSON.stringify(context),
         JSON.stringify(renderer),
-        now
+        now,
+        ingested.live ? 1 : 0
       );
 
     return {
@@ -226,7 +234,7 @@ export class Registry {
     }
 
     const rows = this.many<PublicationRow>(
-      `SELECT p.*, a.kind AS latest_kind, a.context_json AS latest_context FROM publications p
+      `SELECT p.*, a.kind AS latest_kind, a.context_json AS latest_context, a.live AS latest_live FROM publications p
        JOIN artifacts a ON a.id = p.latest_artifact_id
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
        ORDER BY p.pinned DESC, ${col} ${dir} LIMIT ? OFFSET ?`,
@@ -259,6 +267,7 @@ export class Registry {
       updatedAt: row.updated_at,
       kind: row.latest_kind as ArtifactKind | undefined,
       context: row.latest_context ? JSON.parse(row.latest_context) : undefined,
+      live: Boolean(row.latest_live),
     };
   }
 
@@ -304,6 +313,7 @@ function artifactFromRow(row: ArtifactRow): Artifact {
     context: JSON.parse(row.context_json ?? "{}"),
     renderer: JSON.parse(row.renderer_json),
     createdAt: row.created_at,
+    live: Boolean(row.live),
   };
 }
 
