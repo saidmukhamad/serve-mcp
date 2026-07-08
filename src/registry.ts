@@ -66,7 +66,19 @@ export class Registry {
   constructor(dataDir: string) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.db = new DatabaseSync(path.join(dataDir, "registry.sqlite"));
-    this.db.exec("PRAGMA journal_mode = WAL;");
+    // Wait instead of throwing SQLITE_BUSY when several agent processes collide.
+    this.db.exec("PRAGMA busy_timeout = 5000;");
+    // The WAL switch needs exclusive access and ignores busy_timeout; it only
+    // contends on a brand-new db, where whichever process wins converts for all.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      try {
+        this.db.exec("PRAGMA journal_mode = WAL;");
+        break;
+      } catch {
+        const until = Date.now() + 25;
+        while (Date.now() < until);
+      }
+    }
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS publications (
         id TEXT PRIMARY KEY,

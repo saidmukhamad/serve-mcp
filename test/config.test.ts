@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { loadConfig, advertiseHost, setConfigValue, configFilePath } from "../src/config.ts";
 import { startHttp } from "../src/http.ts";
-import { readServerInfo, writeServerInfo } from "../src/server-info.ts";
+import {
+  acquireStartLock,
+  readServerInfo,
+  releaseStartLock,
+  waitForServerInfo,
+  writeServerInfo,
+} from "../src/server-info.ts";
 import { makeDeps } from "./helpers.ts";
 
 test("loadConfig: explicit port builds baseUrl, no port means ephemeral", () => {
@@ -107,6 +113,25 @@ test("startHttp: explicit busy port resolves to null", async () => {
   started.server.close();
   first.cleanup();
   second.cleanup();
+});
+
+test("start lock: one winner, stale locks stolen, release is owner-only", async () => {
+  const dataDir = fs.mkdtempSync("/tmp/serve-mcp-lock-");
+
+  assert.equal(acquireStartLock(dataDir), true, "first claim wins");
+  assert.equal(acquireStartLock(dataDir), true, "same pid holds its own lock");
+  releaseStartLock(dataDir);
+  assert.equal(fs.existsSync(`${dataDir}/server.lock`), false);
+
+  fs.writeFileSync(`${dataDir}/server.lock`, "999999999");
+  assert.equal(acquireStartLock(dataDir), true, "dead holder's lock is stolen");
+
+  writeServerInfo(dataDir, { baseUrl: "http://127.0.0.1:1234", host: "127.0.0.1", port: 1234 });
+  const found = await waitForServerInfo(dataDir, 500);
+  assert.equal(found?.baseUrl, "http://127.0.0.1:1234");
+
+  releaseStartLock(dataDir);
+  fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
 test("readServerInfo: dead pid is ignored", () => {

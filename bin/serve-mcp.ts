@@ -7,7 +7,7 @@ import { ArtifactStore } from "../src/store.ts";
 import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry.ts";
 import { startHttp, type Deps } from "../src/http.ts";
 import { createMcpServer, packageVersion } from "../src/mcp.ts";
-import { readServerInfo } from "../src/server-info.ts";
+import { acquireStartLock, readServerInfo, releaseStartLock, waitForServerInfo } from "../src/server-info.ts";
 import {
   installService,
   restartService,
@@ -72,10 +72,24 @@ switch (cmd) {
   case "mcp": {
     const config = loadConfig(serverFlags(rest));
     const d = deps(config);
-    const existing = config.port === null ? readServerInfo(config.dataDir) : null;
-    if (existing) {
-      config.baseUrl = existing.baseUrl;
-      console.error(`[serve-mcp] using running shelf at ${existing.baseUrl} (pid ${existing.pid})`);
+    // Fixed port: the OS bind is the only-one-server lock. Ephemeral: server.json
+    // discovery, with a start lock so simultaneous sessions can't each bind a port.
+    if (config.port === null) {
+      let existing = readServerInfo(config.dataDir);
+      if (!existing && !acquireStartLock(config.dataDir)) {
+        existing = await waitForServerInfo(config.dataDir);
+      }
+      if (existing) {
+        config.baseUrl = existing.baseUrl;
+        console.error(`[serve-mcp] using running shelf at ${existing.baseUrl} (pid ${existing.pid})`);
+      } else {
+        try {
+          const started = await startHttp(d);
+          if (started) console.error(`[serve-mcp] shelf at ${started.baseUrl}`);
+        } finally {
+          releaseStartLock(config.dataDir);
+        }
+      }
     } else {
       const started = await startHttp(d);
       if (started) {
@@ -95,6 +109,13 @@ switch (cmd) {
 
   case "serve": {
     const config = loadConfig(serverFlags(rest));
+    if (config.port === null) {
+      const existing = readServerInfo(config.dataDir);
+      if (existing) {
+        console.error(`[serve-mcp] a shelf is already running at ${existing.baseUrl} (pid ${existing.pid})`);
+        process.exit(1);
+      }
+    }
     const started = await startHttp(deps(config));
     if (!started) {
       console.error(`[serve-mcp] port ${config.port} already in use`);

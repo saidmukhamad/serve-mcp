@@ -6,6 +6,10 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [0.0.7] - 2026-07-08
 
+### Fixed
+- Only one server, guaranteed: simultaneous ephemeral-mode sessions now elect a single shelf via a start lock (fixed ports already had the OS bind as their lock), and `serve-mcp serve` refuses to start next to a running shelf.
+- Concurrent cold starts no longer crash on SQLite's WAL conversion (`busy_timeout` + retry).
+
 ### Added
 - Dev builds identify as `<version>-dev.<commit>` — `serve-mcp --version` and the MCP handshake include the commit when running from a checkout; CI publishes the same shape to the npm `dev` tag.
 - `/healthz` reports the running version.

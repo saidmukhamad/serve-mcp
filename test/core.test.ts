@@ -38,7 +38,7 @@ test("store ingests content and rejects traversal", () => {
   cleanup();
 });
 
-test("store ingests folders with entrypoint detection", () => {
+test("store ingests folders: entrypoint detected, none falls back to listing", () => {
   const { store, dataDir, cleanup } = makeDeps();
   const site = path.join(dataDir, "site");
   fs.mkdirSync(site, { recursive: true });
@@ -48,16 +48,11 @@ test("store ingests folders with entrypoint detection", () => {
   assert.equal(ing.kind, "static-folder");
   assert.equal(ing.filename, "files/index.html");
   assert.equal(store.statFolderPath(ing.id, "style.css")?.type, "file");
-  cleanup();
-});
 
-test("store ingests folders without entrypoint", () => {
-  const { store, dataDir, cleanup } = makeDeps();
-  const folder = path.join(dataDir, "assets");
-  fs.mkdirSync(folder, { recursive: true });
-  fs.writeFileSync(path.join(folder, "data.csv"), "a,b\n1,2\n");
-  const ing = store.ingest({ type: "folder", path: folder });
-  assert.equal(ing.filename, "files");
+  const assets = path.join(dataDir, "assets");
+  fs.mkdirSync(assets, { recursive: true });
+  fs.writeFileSync(path.join(assets, "data.csv"), "a,b\n1,2\n");
+  assert.equal(store.ingest({ type: "folder", path: assets }).filename, "files");
   cleanup();
 });
 

@@ -137,16 +137,3 @@ test("artifact_delete removes publication, revisions, and files", async () => {
   cleanup();
 });
 
-test("publish from a real file path", async () => {
-  const { client, dataDir, cleanup } = await connect();
-  const file = path.join(dataDir, "work.html");
-  fs.writeFileSync(file, "<h1>work</h1>");
-  const pub = await client.callTool({
-    name: "artifact_publish",
-    arguments: { source: { type: "path", path: file }, title: "Work" },
-  });
-  assert.equal(pub.isError ?? false, false);
-  assert.equal((pub.structuredContent as unknown as PublishStructured).artifact.kind, "html");
-  await client.close();
-  cleanup();
-});

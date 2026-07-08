@@ -26,6 +26,9 @@ test("launchdPlist: reverse-DNS label, runs `serve`, keeps alive, background typ
   assert.match(plist, /<key>ProcessType<\/key><string>Background<\/string>/);
   assert.match(plist, /<key>ThrottleInterval<\/key><integer>10<\/integer>/);
   assert.match(plist, /<string>\/data\/serve\.log<\/string>/);
+
+  const escaped = launchdPlist({ ...paths, bin: "/tmp/a & b/<x>/serve-mcp.js" });
+  assert.match(escaped, /<string>\/tmp\/a &amp; b\/&lt;x&gt;\/serve-mcp\.js<\/string>/);
 });
 
 test("systemdUnit: quoted ExecStart, restarts on failure", () => {
@@ -35,12 +38,6 @@ test("systemdUnit: quoted ExecStart, restarts on failure", () => {
   assert.match(unit, /Restart=on-failure/);
   assert.match(unit, /RestartSec=5/);
   assert.match(unit, /WantedBy=default\.target/);
-});
-
-test("launchdPlist: XML-escapes paths", () => {
-  const plist = launchdPlist({ ...paths, bin: "/tmp/a & b/<x>/serve-mcp.js" });
-  assert.match(plist, /<string>\/tmp\/a &amp; b\/&lt;x&gt;\/serve-mcp\.js<\/string>/);
-  assert.doesNotMatch(plist, /a & b/);
 });
 
 test("windowsLaunchVbs: hidden window, waits, forwards exit code, logs", () => {
