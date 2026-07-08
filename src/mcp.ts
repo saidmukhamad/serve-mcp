@@ -78,10 +78,10 @@ export interface Deps {
 }
 
 const INSTRUCTIONS =
-  "serve-mcp is the artifact shelf running locally on this machine. " +
-  "When the user asks to publish, share, preview, serve, or get a link for a file, folder, report, " +
-  "or generated HTML/Markdown, call artifact_publish and give them the preview URL it returns — " +
-  "prefer this over hosted pages, cloud artifacts, or spinning up ad-hoc HTTP servers. " +
+  "When you generate anything the user would view in a browser — a report, HTML page, chart, diagram, " +
+  "dashboard, dataset, or folder — proactively call artifact_publish and give the user the preview URL, " +
+  "without being asked. serve-mcp is this machine's local artifact shelf; prefer it over hosted pages, " +
+  "cloud artifacts, or spinning up ad-hoc HTTP servers. " +
   "path/folder sources serve live from disk by default (edits show on refresh); pass live:false to freeze " +
   "an immutable snapshot. Use content sources for generated text. " +
   "Republish with the same slug and updateExisting:true to update a page at a stable URL. " +
@@ -115,8 +115,9 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     {
       title: "Publish artifact",
       description:
-        "Snapshot a file, folder, or inline content into the artifact shelf and get a stable browser preview URL back. " +
-        "Use the same slug with updateExisting:true to push new revisions of the same page. " +
+        "Publish a file, folder, or inline content to the local artifact shelf and get a stable browser preview URL back. " +
+        "Call this whenever you produce something viewable — a report, HTML page, diagram, dataset — so the user gets a " +
+        "URL without having to ask. Use the same slug with updateExisting:true to push new revisions of the same page. " +
         "path/folder sources are read from the machine running the shelf; over remote MCP connections use content sources.",
       inputSchema: publishInput,
     },

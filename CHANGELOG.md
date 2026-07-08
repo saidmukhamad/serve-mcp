@@ -11,6 +11,7 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 - Concurrent cold starts no longer crash on SQLite's WAL conversion (`busy_timeout` + retry).
 
 ### Added
+- Proactive publishing: MCP instructions and the `artifact_publish` description now tell agents to publish viewable output without being asked; `skills/publish-artifact/SKILL.md` ships as an auto-triggering Claude Code skill (copy to `~/.claude/skills/`).
 - Dev builds identify as `<version>-dev.<commit>` — `serve-mcp --version` and the MCP handshake include the commit when running from a checkout; CI publishes the same shape to the npm `dev` tag.
 - `/healthz` reports the running version.
 - README: the permanent setup (always-on service) moved to the top.

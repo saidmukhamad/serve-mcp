@@ -50,6 +50,16 @@ loginctl enable-linger $USER     # Linux only: keep it alive after you log out
 
 Without this the shelf still works — it just lives and dies with your MCP sessions (details in [Lifecycle](#lifecycle-who-keeps-the-shelf-alive)).
 
+### Proactive publishing
+
+The server's MCP instructions already tell agents to publish viewable output on their own. For the strongest nudge in Claude Code, install the bundled skill — it auto-triggers whenever the agent produces something viewable:
+
+```bash
+mkdir -p ~/.claude/skills/publish-artifact
+curl -fsSL https://raw.githubusercontent.com/saidmukhamad/serve-mcp/main/skills/publish-artifact/SKILL.md \
+  -o ~/.claude/skills/publish-artifact/SKILL.md
+```
+
 ## How it works
 
 ```txt
