@@ -162,6 +162,6 @@ npm run build     # tsc -> dist/
 
 Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. The published package runs on **Node ≥ 22.5** (built-in `node:sqlite`); developing needs **Node ≥ 22.18** (type stripping).
 
-Conventions: between releases the version carries a `-dev` suffix (`npm version patch` strips it at release time, then `npm publish`). Commits use prefixes — `feat:` `fix:` `docs:` `refactor:` `test:` `chore:` `ci:`. Changes accumulate under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) and get stamped at release.
+Conventions: between releases the version carries a `-dev` suffix; every push to main auto-publishes it as `<version>.<short-sha>` under the npm **`dev` dist-tag** (`npm i @saidmukhamad/serve-mcp@dev` for bleeding edge). Releasing: `npm version patch` strips the suffix, `npm publish` puts it on `latest`. Commits use prefixes — `feat:` `fix:` `docs:` `refactor:` `test:` `chore:` `ci:`. Changes accumulate under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) and get stamped at release.
 
 MIT.

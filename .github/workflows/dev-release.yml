@@ -1,0 +1,41 @@
+name: dev release
+
+# Publishes every main push as <version>.<short-sha> under the `dev` dist-tag,
+# but only while package.json carries a -dev version. `latest` is never touched;
+# stable releases stay on v* tags (release.yml).
+# Requires the NPM_TOKEN repo secret; skips quietly without it.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  dev-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm test
+      - name: publish under the dev tag
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          case "$VERSION" in
+            *-dev)
+              npm version "${VERSION}.$(git rev-parse --short HEAD)" --no-git-tag-version
+              npm publish --provenance --access public --tag dev
+              ;;
+            *)
+              echo "version $VERSION has no -dev suffix — skipping dev publish"
+              ;;
+          esac
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
