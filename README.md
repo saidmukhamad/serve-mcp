@@ -42,8 +42,8 @@ That's it. Ask any agent to publish something and open the URL it returns — on
 ```txt
 MCP = control plane        (artifact_publish, artifact_list, resources)
 HTTP = human preview plane (gallery, /p/:slug, sandboxed previews)
-Registry = SQLite          (stable publications -> immutable revisions)
-Store = snapshots          (or live: true to serve straight from the source)
+Registry = SQLite          (stable publications -> revisions)
+Store = live | snapshot    (path/folder serve live by default; live:false freezes a copy)
 ```
 
 ## The tools
@@ -56,7 +56,7 @@ Store = snapshots          (or live: true to serve straight from the source)
   "title": "Training run explanation",
   "slug": "training-run-explanation",                     // stable /p/<slug>; generated if omitted
   "updateExisting": true,                                 // add a revision; false = conflict on an existing slug
-  "live": false,                                          // true = serve from the source path, edits show on refresh
+  "live": true,                                           // default for path/folder: edits show on refresh; false = frozen snapshot
   "tags": ["ml", "report"],
   "renderer": { "options": { "allowScripts": false } }    // scripts stay off unless asked
 }
@@ -82,7 +82,7 @@ N agents, one shelf, no coordination. The first `serve-mcp` to start binds a por
 
 ## Rendering & safety
 
-Sources are **snapshotted** into the store (`~/.local/share/serve-mcp`) by default, so nothing is served from your workspace and revisions never change. Publish with `live: true` (CLI: `--live`) to flip that for path/folder sources: the shelf serves straight from the source, edits show on refresh, and the page breaks if the source moves. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter, live `mermaid` diagrams); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
+Path and folder sources serve **live** by default — the shelf reads straight from the source on every request, so edits show on refresh (and the page breaks if the source moves). Publish with `live: false` (CLI: `--snapshot`) to freeze an immutable copy into the store (`~/.local/share/serve-mcp`) instead; inline `content` sources are always stored. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter, live `mermaid` diagrams); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
 
 The server binds `127.0.0.1` unless you opt into `0.0.0.0`, and there is no auth — only expose it to networks you trust (a Tailscale tailnet qualifies; the open internet does not). Restrict path publishing with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 
@@ -180,6 +180,6 @@ npm run build     # tsc -> dist/
 
 Written in TypeScript; dev and tests run `.ts` directly via Node's native type stripping. The published package runs on **Node ≥ 22.5** (built-in `node:sqlite`); developing needs **Node ≥ 22.18** (type stripping).
 
-Conventions: between releases the version carries a `-dev` suffix; every push to main auto-publishes it as `<version>.<short-sha>` under the npm **`dev` dist-tag** (`npm i @saidmukhamad/serve-mcp@dev` for bleeding edge). Releasing: `npm version patch` strips the suffix, `npm publish` puts it on `latest`. Commits use prefixes — `feat:` `fix:` `docs:` `refactor:` `test:` `chore:` `ci:` — enforced locally by a `commit-msg` hook (`.githooks/`, wired up automatically by `npm install`). Changes accumulate under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) and get stamped at release.
+Changes live in [CHANGELOG.md](CHANGELOG.md); bleeding edge installs with `@dev` instead of `@latest`.
 
 MIT.

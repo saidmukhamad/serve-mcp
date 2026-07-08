@@ -1,5 +1,8 @@
 #!/bin/sh
-# Enforces conventional commit prefixes (see README "Development").
+# Enforces conventional commit prefixes. Wired up by `npm install` (prepare script).
+# Release flow: version carries -dev between releases (auto-published to the npm
+# `dev` dist-tag by dev-release.yml); `npm version patch` strips it, `npm publish`
+# goes to `latest`, [Unreleased] in CHANGELOG.md gets stamped.
 msg=$(head -1 "$1")
 
 case "$msg" in

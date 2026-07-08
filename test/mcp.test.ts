@@ -32,6 +32,31 @@ test("server advertises instructions steering agents to the shelf", async () => 
   cleanup();
 });
 
+test("path sources publish live by default, content stays stored", async () => {
+  const { client, cleanup, config } = await connect();
+  const src = path.join(config.dataDir, "live-default.md");
+  fs.writeFileSync(src, "# live");
+  const pub = await client.callTool({
+    name: "artifact_publish",
+    arguments: { source: { type: "path", path: src } },
+  });
+  assert.equal((pub.structuredContent as { artifact: { live: boolean } }).artifact.live, true);
+
+  const frozen = await client.callTool({
+    name: "artifact_publish",
+    arguments: { source: { type: "path", path: src }, slug: "frozen", live: false },
+  });
+  assert.equal((frozen.structuredContent as { artifact: { live: boolean } }).artifact.live, false);
+
+  const content = await client.callTool({
+    name: "artifact_publish",
+    arguments: { source: { type: "content", content: "x", filename: "x.md" } },
+  });
+  assert.equal((content.structuredContent as { artifact: { live: boolean } }).artifact.live, false);
+  await client.close();
+  cleanup();
+});
+
 test("artifact_publish + artifact_list + resources round trip", async () => {
   const { client, cleanup } = await connect();
 

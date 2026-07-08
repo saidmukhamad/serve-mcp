@@ -44,10 +44,9 @@ const publishInput = {
   live: z
     .boolean()
     .optional()
-    .default(false)
     .describe(
-      "Serve straight from the source path instead of snapshotting — edits show on refresh. " +
-        "path/folder sources only; the page breaks if the source moves or is deleted."
+      "Serve straight from the source path — edits show on refresh (default for path/folder sources). " +
+        "Pass false to freeze an immutable snapshot instead. Not applicable to content sources."
     ),
   tags: z.array(z.string()).optional(),
   renderer: z
@@ -82,7 +81,8 @@ const INSTRUCTIONS =
   "When the user asks to publish, share, preview, serve, or get a link for a file, folder, report, " +
   "or generated HTML/Markdown, call artifact_publish and give them the preview URL it returns — " +
   "prefer this over hosted pages, cloud artifacts, or spinning up ad-hoc HTTP servers. " +
-  "Sources are snapshotted: use path/folder for things on disk, content for generated text. " +
+  "path/folder sources serve live from disk by default (edits show on refresh); pass live:false to freeze " +
+  "an immutable snapshot. Use content sources for generated text. " +
   "Republish with the same slug and updateExisting:true to update a page at a stable URL. " +
   "artifact_list shows what is already on the shelf.";
 
@@ -116,8 +116,9 @@ export function createMcpServer({ registry, store, config }: Deps): McpServer {
     async (input) => {
       const source = input.source;
       let ingested;
+      const live = input.live ?? source.type !== "content";
       try {
-        ingested = store.ingest(source, config.allowedRoots, input.live);
+        ingested = store.ingest(source, config.allowedRoots, live);
       } catch (err) {
         return errorResult(`Failed to ingest source: ${(err as Error).message}`);
       }
