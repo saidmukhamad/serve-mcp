@@ -178,6 +178,10 @@ const DOC_CSS = `
   .listing { list-style: none; padding: 0; font: 14px/2 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .listing .size { float: right; color: light-dark(#777782, #8b8b96); }
   input[type=checkbox] { accent-color: #0b62d6; }
+  @media (max-width: 640px) {
+    body { padding: 1rem 0.9rem; }
+    table { display: block; overflow-x: auto; }
+  }
 `;
 
 export function htmlDoc(title: string, css: string, bodyHtml: string, bodyAttrs = ""): string {

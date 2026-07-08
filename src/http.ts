@@ -250,7 +250,8 @@ const UI_CSS = `
   header.bar { display: flex; align-items: center; gap: 0.9rem; padding: 0.65rem 1.1rem;
                background: light-dark(#ffffff, #17171c); border-bottom: 1px solid light-dark(#e4e4ea, #26262e);
                position: sticky; top: 0; }
-  header.bar h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+  header.bar h1 { font-size: 1rem; margin: 0; font-weight: 600; min-width: 0;
+                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badge { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 99px; text-transform: uppercase;
            letter-spacing: 0.04em; background: light-dark(#eceff4, #26262e); color: light-dark(#4a4a55, #a8a8b2); }
   .badge.live { background: light-dark(#e7f7ec, #16281c); color: light-dark(#1a7f37, #4ec97a); }
@@ -260,6 +261,7 @@ const UI_CSS = `
          background: light-dark(#fff, #1d1d23); color: inherit; cursor: pointer; }
   main.gallery { max-width: 60rem; margin: 0 auto; padding: 1.4rem 1.1rem 4rem; }
   form.search input { width: 100%; padding: 0.55rem 0.9rem; border-radius: 8px; font: inherit;
+                      font-size: 16px; /* <16px makes iOS zoom on focus */
                       border: 1px solid light-dark(#d8d8e0, #33333c); background: light-dark(#fff, #17171c); color: inherit; }
   .card { position: relative; display: flex; align-items: center; gap: 0.8rem; padding: 0.85rem 1rem;
           margin-top: 0.7rem; background: light-dark(#ffffff, #17171c);
@@ -289,7 +291,7 @@ const UI_CSS = `
   .menu-items .danger { color: light-dark(#c93c3c, #ff7a7a); }
   h2.section { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em;
                color: light-dark(#8a8a94, #77777f); margin: 1.6rem 0 0.2rem; }
-  body.shell { display: flex; flex-direction: column; height: 100vh; }
+  body.shell { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
   iframe.preview { display: block; width: 100%; flex: 1; border: 0;
                    background: light-dark(#fff, #16161a); }
   .subbar { display: flex; flex-wrap: wrap; gap: 0.6rem; padding: 0.4rem 1.1rem; font-size: 0.82rem;
@@ -299,6 +301,19 @@ const UI_CSS = `
          font: 0.92em ui-monospace, SFMono-Regular, Menlo, monospace; }
   .prov { font-size: 0.78rem; color: light-dark(#8a8a94, #77777f); }
   .empty { text-align: center; padding: 4rem 0; }
+  @media (max-width: 640px) {
+    header.bar { flex-wrap: wrap; gap: 0.55rem; padding: 0.55rem 0.8rem; }
+    .subbar { padding: 0.4rem 0.8rem; }
+    main.gallery { padding: 1rem 0.8rem 4rem; }
+    .card { flex-wrap: wrap; padding: 0.75rem 0.85rem; }
+    .card .side { margin-left: 0; width: 100%; justify-content: flex-start;
+                  flex-wrap: wrap; flex-shrink: 1; row-gap: 0.3rem; }
+  }
+  @media (pointer: coarse) {
+    details.menu summary { padding: 0.35rem 0.85rem; }
+    .menu-items a, .menu-items button { padding: 0.7rem 1rem; }
+    .btn { padding: 0.45rem 0.9rem; }
+  }
 `;
 
 function page(title: string, body: string, bodyAttrs = ""): string {

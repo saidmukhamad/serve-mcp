@@ -6,6 +6,8 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ### Added
 - Bare-path shorthand: `serve-mcp ./report.md` publishes and prints the URL; `serve-mcp .` serves the current directory, live.
+- Folder deep links: browsing a served folder updates the address bar (`/p/:slug/f/<path>`), so reload and share keep the place; listing links navigate the top window.
+- Mobile pass: cards, headers, and menus adapt below 640px; comfortable touch targets on coarse pointers; `100dvh` shell; frame tables scroll horizontally; no iOS zoom-on-focus.
 
 ## [0.0.8] - 2026-07-08
 
