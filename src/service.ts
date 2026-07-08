@@ -230,6 +230,19 @@ export function installService(dataDir: string): string {
   }
 }
 
+export function serviceInstalled(): boolean {
+  switch (process.platform) {
+    case "darwin":
+      return fs.existsSync(plistPath(SERVICE_LABEL));
+    case "linux":
+      return fs.existsSync(unitPath());
+    case "win32":
+      return run("schtasks", ["/Query", "/TN", WIN_TASK], true) !== "";
+    default:
+      return false;
+  }
+}
+
 export function startService(): string {
   switch (process.platform) {
     case "darwin":

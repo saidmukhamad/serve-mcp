@@ -11,6 +11,7 @@ import { readServerInfo } from "../src/server-info.ts";
 import {
   installService,
   restartService,
+  serviceInstalled,
   serviceLogs,
   serviceStatus,
   startService,
@@ -24,6 +25,8 @@ const USAGE = `serve-mcp — local MCP-controlled artifact shelf
 Usage:
   serve-mcp                                   show shelf status and publications
   serve-mcp config [<key> [<value>]]          show or set config (host, port, baseUrl)
+  serve-mcp restart                           restart the shelf / apply config changes
+                                              (alias: apply)
   serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server
   serve-mcp publish <path> [opts]             publish a file/folder from the CLI
   serve-mcp list                              list publications
@@ -157,6 +160,26 @@ switch (cmd) {
     break;
   }
 
+  case "restart":
+  case "apply": {
+    const config = loadConfig();
+    if (serviceInstalled()) {
+      console.log(restartService());
+      break;
+    }
+    const info = readServerInfo(config.dataDir);
+    if (!info) {
+      console.log("shelf: not running — nothing to restart (start with `serve-mcp serve` or an MCP session)");
+      break;
+    }
+    process.kill(info.pid, "SIGTERM");
+    console.log(
+      `stopped shelf (pid ${info.pid}) — it was not service-managed; ` +
+        "whatever started it must start it again (the next MCP session will, `serve-mcp serve` needs a rerun)"
+    );
+    break;
+  }
+
   case "service": {
     const config = loadConfig();
     try {
@@ -209,7 +232,7 @@ switch (cmd) {
     if (key !== undefined && value !== undefined) {
       const file = setConfigValue(config.dataDir, key as ConfigKey, value);
       console.log(JSON.stringify(file, null, 2).trim());
-      console.log(`written to ${configFilePath(config.dataDir)} — restart the shelf to apply`);
+      console.log(`written to ${configFilePath(config.dataDir)} — apply with \`serve-mcp restart\``);
     } else {
       const effective: Record<ConfigKey, string> = {
         host: config.host,
