@@ -1,6 +1,6 @@
 {
   "name": "@saidmukhamad/serve-mcp",
-  "version": "0.0.5-dev",
+  "version": "0.0.6-dev",
   "description": "Local MCP-controlled artifact shelf: agents publish HTML, Markdown, folders and files; humans get nice preview URLs.",
   "keywords": [
     "mcp",
@@ -40,7 +40,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "npm run typecheck && node --test \"test/*.test.ts\"",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "node -e \"const v=require('./package.json').version; if(v.includes('-dev')&&process.env.npm_config_tag!=='dev'){console.error('refusing to publish '+v+' to latest — run npm version patch first (CI ships -dev builds to the dev tag)');process.exit(1)}\" && npm run build"
   },
   "dependencies": {
     "@hono/mcp": "^0.3.0",
