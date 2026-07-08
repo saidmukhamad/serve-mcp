@@ -101,9 +101,13 @@ serve-mcp config port 7331     # fixed port, stable URLs
 serve-mcp service install      # launchd on macOS, systemd --user on Linux
 ```
 
-`serve-mcp service status` shows the supervisor's view (running/pid), `restart` applies config changes, `uninstall` removes it. The agent is a user-level service — no root, labeled `io.github.saidmukhamad.serve-mcp`, logs in `<dataDir>/serve.log` (macOS) or the journal (Linux). It pins the current runtime and package paths (shown on install) — re-run install after upgrading either.
+Manage it with `serve-mcp service start|stop|restart|status|logs|uninstall`. Everything is user-level — no root/admin:
 
-On Windows there is no service integration: `serve-mcp service …` exits with a clear error. Everything else works (the shelf, MCP, CLI — `node:sqlite` is cross-platform); for an always-on shelf run `serve-mcp serve` via Task Scheduler or keep it session-managed.
+- **macOS** — launchd agent (`io.github.saidmukhamad.serve-mcp` in `~/Library/LaunchAgents`), KeepAlive supervision, logs in `<dataDir>/serve.log`.
+- **Linux** — systemd user unit, `Restart=on-failure`, logs in the journal. To survive logout: `loginctl enable-linger $USER`. On WSL, systemd user services are often unavailable — run `serve-mcp serve` in tmux instead.
+- **Windows** — Task Scheduler task registered from XML (no admin): starts hidden at logon via `wscript`, restarts on failure, logs in `<dataDir>\serve.log`.
+
+The service pins the current runtime and package paths (shown on install) — re-run `service install` after upgrading either.
 
 ## Tailscale / LAN access
 

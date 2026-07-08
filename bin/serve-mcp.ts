@@ -8,7 +8,15 @@ import { Registry, artifactWithUrls, publicationWithUrls } from "../src/registry
 import { startHttp, type Deps } from "../src/http.ts";
 import { createMcpServer } from "../src/mcp.ts";
 import { readServerInfo } from "../src/server-info.ts";
-import { installService, restartService, serviceStatus, uninstallService } from "../src/service.ts";
+import {
+  installService,
+  restartService,
+  serviceLogs,
+  serviceStatus,
+  startService,
+  stopService,
+  uninstallService,
+} from "../src/service.ts";
 import { captureContext } from "../src/provenance.ts";
 
 const USAGE = `serve-mcp — local MCP-controlled artifact shelf
@@ -19,8 +27,9 @@ Usage:
   serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server
   serve-mcp publish <path> [opts]             publish a file/folder from the CLI
   serve-mcp list                              list publications
-  serve-mcp service install|status|restart|uninstall
-                                              always-on shelf (launchd / systemd --user)
+  serve-mcp service <action>                  always-on shelf: install, start, stop,
+                                              restart, status, logs, uninstall
+                                              (launchd / systemd --user / Task Scheduler)
   serve-mcp mcp [--port <p>] [--host <h>]     run MCP server on stdio (for MCP clients)
 
 Examples:
@@ -160,6 +169,12 @@ switch (cmd) {
           }
           console.log(installService(config.dataDir));
           break;
+        case "start":
+          console.log(startService());
+          break;
+        case "stop":
+          console.log(stopService());
+          break;
         case "restart":
           console.log(restartService());
           break;
@@ -167,11 +182,14 @@ switch (cmd) {
         case undefined:
           console.log(serviceStatus());
           break;
+        case "logs":
+          console.log(serviceLogs(config.dataDir));
+          break;
         case "uninstall":
-          console.log(uninstallService());
+          console.log(uninstallService(config.dataDir));
           break;
         default:
-          console.error("usage: serve-mcp service install|status|restart|uninstall");
+          console.error("usage: serve-mcp service install|start|stop|restart|status|logs|uninstall");
           process.exit(1);
       }
     } catch (err) {

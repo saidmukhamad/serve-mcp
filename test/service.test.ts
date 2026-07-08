@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { launchdPlist, systemdUnit, runtimeWarnings, SERVICE_LABEL } from "../src/service.ts";
+import {
+  launchdPlist,
+  systemdUnit,
+  windowsLaunchVbs,
+  windowsTaskXml,
+  runtimeWarnings,
+  SERVICE_LABEL,
+} from "../src/service.ts";
 
 const paths = {
   node: "/usr/local/bin/node",
@@ -34,6 +41,29 @@ test("launchdPlist: XML-escapes paths", () => {
   const plist = launchdPlist({ ...paths, bin: "/tmp/a & b/<x>/serve-mcp.js" });
   assert.match(plist, /<string>\/tmp\/a &amp; b\/&lt;x&gt;\/serve-mcp\.js<\/string>/);
   assert.doesNotMatch(plist, /a & b/);
+});
+
+test("windowsLaunchVbs: hidden window, waits, forwards exit code, logs", () => {
+  const vbs = windowsLaunchVbs({
+    node: "C:\\Program Files\\nodejs\\node.exe",
+    bin: "C:\\Users\\x\\serve-mcp\\bin\\serve-mcp.js",
+    dataDir: "C:\\Users\\x\\data",
+    logFile: "C:\\Users\\x\\data\\serve.log",
+  });
+  assert.match(vbs, /""C:\\Program Files\\nodejs\\node\.exe"" ""C:\\Users\\x\\serve-mcp\\bin\\serve-mcp\.js"" serve/);
+  assert.match(vbs, /, 0, True\)/);
+  assert.match(vbs, /WScript\.Quit rc/);
+  assert.match(vbs, />> ""C:\\Users\\x\\data\\serve\.log"" 2>&1/);
+});
+
+test("windowsTaskXml: current-user logon trigger, least privilege, keep-alive settings", () => {
+  const xml = windowsTaskXml("C:\\Users\\x\\data\\serve-mcp-launch.vbs", "PC\\user");
+  assert.match(xml, /<LogonTrigger>[\s\S]*<UserId>PC\\user<\/UserId>/);
+  assert.match(xml, /<RunLevel>LeastPrivilege<\/RunLevel>/);
+  assert.match(xml, /<ExecutionTimeLimit>PT0S<\/ExecutionTimeLimit>/);
+  assert.match(xml, /<RestartOnFailure>[\s\S]*<Interval>PT1M<\/Interval>/);
+  assert.match(xml, /<Command>wscript\.exe<\/Command>/);
+  assert.match(xml, /<Arguments>"C:\\Users\\x\\data\\serve-mcp-launch\.vbs"<\/Arguments>/);
 });
 
 test("runtimeWarnings: old node, npx cache, version-manager paths", () => {
