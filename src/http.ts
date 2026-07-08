@@ -29,7 +29,7 @@ import { createRequire } from "node:module";
 
 const MERMAID_JS = createRequire(import.meta.url).resolve("mermaid/dist/mermaid.min.js");
 import { StreamableHTTPTransport } from "@hono/mcp";
-import { createMcpServer, type Deps } from "./mcp.ts";
+import { createMcpServer, packageVersion, type Deps } from "./mcp.ts";
 
 export type { Deps };
 
@@ -188,7 +188,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     return send(c, fs.readFileSync(MERMAID_JS), "text/javascript; charset=utf-8");
   });
 
-  app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp" }));
+  app.get("/healthz", (c) => c.json({ ok: true, name: "serve-mcp", version: packageVersion() }));
 
   // MCP over HTTP: lets other machines add this shelf as an MCP server
   // (claude mcp add --transport http shelf <baseUrl>/mcp). Stateless — one

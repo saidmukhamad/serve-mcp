@@ -37,6 +37,19 @@ Anything else that speaks MCP (Cursor, Windsurf, ...) — the usual `mcpServers`
 
 That's it. Ask any agent to publish something and open the URL it returns — one gallery for everything, whoever made it.
 
+### The permanent setup
+
+One always-on server that every agent and human on the machine works against:
+
+```bash
+serve-mcp config host 0.0.0.0    # reachable over your tailnet/LAN (skip for localhost-only)
+serve-mcp config port 7331       # fixed port, stable URLs
+serve-mcp service install        # launchd / systemd --user / Task Scheduler
+loginctl enable-linger $USER     # Linux only: keep it alive after you log out
+```
+
+Without this the shelf still works — it just lives and dies with your MCP sessions (details in [Lifecycle](#lifecycle-who-keeps-the-shelf-alive)).
+
 ## How it works
 
 ```txt
@@ -114,20 +127,7 @@ A shelf runs in one of three modes:
 2. **Foreground** — `serve-mcp serve` in a terminal. Ctrl-C kills it, nothing respawns it.
 3. **Service-managed** (recommended) — the OS supervises it: starts at login, restarts on crash, independent of any session or terminal.
 
-`serve-mcp` shows which one is running; `serve-mcp restart` (alias `apply`) restarts it — through the supervisor when the service is installed, by pid otherwise.
-
-### The permanent setup
-
-One always-on server that every agent and human on the machine works against:
-
-```bash
-serve-mcp config host 0.0.0.0    # reachable over your tailnet/LAN (skip for localhost-only)
-serve-mcp config port 7331       # fixed port, stable URLs
-serve-mcp service install        # launchd / systemd --user / Task Scheduler
-loginctl enable-linger $USER     # Linux only: keep it alive after you log out
-```
-
-Manage it with `serve-mcp service start|stop|restart|status|logs|uninstall`. Everything is user-level — no root/admin:
+`serve-mcp` shows which one is running; `serve-mcp restart` (alias `apply`) restarts it — through the supervisor when the service is installed, by pid otherwise. The service mode is [the permanent setup](#the-permanent-setup) from the top. Manage it with `serve-mcp service start|stop|restart|status|logs|uninstall`. Everything is user-level — no root/admin:
 
 - **macOS** — launchd agent (`io.github.saidmukhamad.serve-mcp` in `~/Library/LaunchAgents`), KeepAlive supervision, logs in `<dataDir>/serve.log`.
 - **Linux** — systemd user unit, `Restart=on-failure`, logs in the journal. To survive logout: `loginctl enable-linger $USER`. On WSL, systemd user services are often unavailable — run `serve-mcp serve` in tmux instead.
