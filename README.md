@@ -101,7 +101,9 @@ serve-mcp config port 7331     # fixed port, stable URLs
 serve-mcp service install      # launchd on macOS, systemd --user on Linux
 ```
 
-`serve-mcp service restart` applies config changes; `serve-mcp service uninstall` removes it. The service pins the current runtime and package paths (shown on install) — re-run install after upgrading either.
+`serve-mcp service status` shows the supervisor's view (running/pid), `restart` applies config changes, `uninstall` removes it. The agent is a user-level service — no root, labeled `io.github.saidmukhamad.serve-mcp`, logs in `<dataDir>/serve.log` (macOS) or the journal (Linux). It pins the current runtime and package paths (shown on install) — re-run install after upgrading either.
+
+On Windows there is no service integration: `serve-mcp service …` exits with a clear error. Everything else works (the shelf, MCP, CLI — `node:sqlite` is cross-platform); for an always-on shelf run `serve-mcp serve` via Task Scheduler or keep it session-managed.
 
 ## Tailscale / LAN access
 
