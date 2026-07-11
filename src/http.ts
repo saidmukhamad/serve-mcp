@@ -49,7 +49,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     (artifact.kind === "markdown" || artifact.kind === "mdx") &&
     hasMermaid(store.readSource(artifact.id, artifact.filename).toString("utf8"));
   const shellSandbox = (artifact: Artifact) => {
-    const sb = sandboxFor(artifact);
+    const sb = sandboxFor(artifact, config);
     if (sb.includes("allow-scripts") || !artifactHasMermaid(artifact)) return sb;
     return `${sb} allow-scripts`;
   };
@@ -107,7 +107,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
       return send(c, body, contentType);
     }
     const { body, contentType } = await renderArtifact(artifact, raw);
-    c.header("Content-Security-Policy", cspFor(artifact));
+    c.header("Content-Security-Policy", cspFor(artifact, config));
     return send(c, body, contentType);
   });
 
@@ -117,7 +117,7 @@ export function createApp({ registry, store, config }: Deps): Hono {
     const rel = decodeURIComponent(c.req.path.split("/").slice(3).join("/"));
     const entry = store.statFolderPath(artifact.id, rel === "" ? "." : rel);
     if (!entry) return c.text("not found", 404);
-    c.header("Content-Security-Policy", cspFor(artifact));
+    c.header("Content-Security-Policy", cspFor(artifact, config));
 
     if (entry.type === "dir") {
       if (rel !== "" && !rel.endsWith("/")) return c.redirect(`${c.req.path}/`);

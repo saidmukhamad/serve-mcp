@@ -27,7 +27,7 @@ Usage:
   serve-mcp                                   show shelf status and publications
   serve-mcp <path> [opts]                     publish a file/folder and print its URL
                                               ("serve-mcp ." serves this directory, live)
-  serve-mcp config [<key> [<value>]]          show or set config (host, port, baseUrl)
+  serve-mcp config [<key> [<value>]]          show or set config (host, port, baseUrl, stripScripts)
   serve-mcp restart                           restart the shelf / apply config changes
                                               (alias: apply)
   serve-mcp serve [--port <p>] [--host <h>]   run the HTTP preview server
@@ -54,6 +54,7 @@ Env:
   SERVE_MCP_DATA_DIR (~/.local/share/serve-mcp)
   SERVE_MCP_BASE_URL (advertised URL override)
   SERVE_MCP_ALLOWED_ROOTS (colon-separated publish roots)
+  SERVE_MCP_STRIP_SCRIPTS (false; set true to disable HTML/folder scripts)
 `;
 
 let [cmdArg, ...rest] = process.argv.slice(2);
@@ -274,6 +275,7 @@ switch (cmd) {
         host: config.host,
         port: config.port === null ? "(ephemeral)" : String(config.port),
         baseUrl: config.baseUrl ?? "(auto)",
+        stripScripts: String(config.stripScripts),
       };
       if (key !== undefined) {
         console.log(effective[key as ConfigKey]);

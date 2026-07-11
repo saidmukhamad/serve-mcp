@@ -81,7 +81,7 @@ Store = live | snapshot    (path/folder serve live by default; live:false freeze
   "updateExisting": true,                                 // add a revision; false = conflict on an existing slug
   "live": true,                                           // default for path/folder: edits show on refresh; false = frozen snapshot
   "tags": ["ml", "report"],
-  "renderer": { "options": { "allowScripts": false } }    // scripts stay off unless asked
+  "renderer": { "options": { "allowScripts": false } }    // optional: disable scripts for this artifact
 }
 ```
 
@@ -106,6 +106,8 @@ N agents, one shelf, no coordination. The first `serve-mcp` to start binds a por
 ## Rendering & safety
 
 Path and folder sources serve **live** by default — the shelf reads straight from the source on every request, so edits show on refresh (and the page breaks if the source moves). Publish with `live: false` (CLI: `--snapshot`) to freeze an immutable copy into the store (`~/.local/share/serve-mcp`) instead; inline `content` sources are always stored. Markdown/MDX renders through [Sätteri](https://satteri.bruits.org) (GFM, frontmatter, live `mermaid` diagrams); JSON pretty-prints; CSV becomes a table; folders serve as static sites.
+
+HTML files and static folders run inline and same-shelf JavaScript by default inside a sandboxed iframe (without `allow-same-origin`). Set `stripScripts` to `true` to block scripts server-wide with CSP plus the iframe sandbox, or publish one artifact with `renderer.options.allowScripts: false`. Markdown and the other rendered formats stay script-blocked; Mermaid uses nonce-gated scripts.
 
 The server binds `127.0.0.1` unless you opt into `0.0.0.0`, and there is no auth — only expose it to networks you trust (a Tailscale tailnet qualifies; the open internet does not). Restrict path publishing with `SERVE_MCP_ALLOWED_ROOTS=/path/a:/path/b`.
 
@@ -170,7 +172,8 @@ serve-mcp list                                   # (also discovers a running she
   "host": "0.0.0.0",
   "port": 7331,
   "baseUrl": "http://my-machine.tailnet.ts.net:7331",
-  "allowedRoots": ["~/projects", "/srv/artifacts"]
+  "allowedRoots": ["~/projects", "/srv/artifacts"],
+  "stripScripts": false
 }
 ```
 
@@ -178,8 +181,9 @@ serve-mcp list                                   # (also discovers a running she
 - `port` — fixed port; omit for an ephemeral port + discovery via `server.json`
 - `baseUrl` — advertised-URL override (e.g. a MagicDNS name)
 - `allowedRoots` — restrict where `path`/`folder` publishing may read from (default: anywhere readable)
+- `stripScripts` — block JavaScript in HTML and static-folder previews, default `false`
 
-Env vars (`SERVE_MCP_HOST`, `SERVE_MCP_PORT`, `SERVE_MCP_BASE_URL`, `SERVE_MCP_DATA_DIR`, `SERVE_MCP_ALLOWED_ROOTS`) override the file; `--host`/`--port` flags override both.
+Env vars (`SERVE_MCP_HOST`, `SERVE_MCP_PORT`, `SERVE_MCP_BASE_URL`, `SERVE_MCP_DATA_DIR`, `SERVE_MCP_ALLOWED_ROOTS`, `SERVE_MCP_STRIP_SCRIPTS`) override the file; `--host`/`--port` flags override both.
 
 ## Development
 

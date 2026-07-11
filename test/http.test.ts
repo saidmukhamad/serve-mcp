@@ -51,24 +51,46 @@ test("gallery, shell, frame, raw, api", async () => {
   cleanup();
 });
 
-test("html artifact served in no-script frame; allowScripts loosens sandbox", async () => {
+test("html scripts run by default and can be disabled per artifact", async () => {
   const { store, registry, get, cleanup } = setup();
   const ing = store.ingest({ type: "content", content: "<h1>hi</h1><script>x()</script>", filename: "p.html" });
   registry.publish({ ingested: ing, title: "Plain", sourceType: "content" });
   const frame = await get(`/frame/${ing.id}`);
-  assert.match(frame.headers.get("content-security-policy")!, /script-src 'none'/);
+  assert.doesNotMatch(frame.headers.get("content-security-policy")!, /script-src 'none'/);
+  assert.match(await (await get("/p/plain")).text(), /sandbox="[^"]*allow-scripts[^"]*"/);
 
   const ing2 = store.ingest({ type: "content", content: "<script>x()</script>", filename: "app.html" });
   registry.publish({
     ingested: ing2,
     title: "App",
     sourceType: "content",
-    renderer: { name: "html-sandbox", options: { allowScripts: true } },
+    renderer: { name: "html-sandbox", options: { allowScripts: false } },
   });
   const frame2 = await get(`/frame/${ing2.id}`);
-  assert.doesNotMatch(frame2.headers.get("content-security-policy")!, /script-src 'none'/);
+  assert.match(frame2.headers.get("content-security-policy")!, /script-src 'none'/);
   const shell2 = await get("/p/app");
-  assert.match(await shell2.text(), /sandbox="[^"]*allow-scripts[^"]*"/);
+  assert.doesNotMatch(await shell2.text(), /allow-scripts/);
+  cleanup();
+});
+
+test("stripScripts config forces HTML scripts off", async () => {
+  const { store, registry, config, get, cleanup } = setup();
+  config.stripScripts = true;
+  const ing = store.ingest({
+    type: "content",
+    content: "<button onclick=\"go()\">go</button><script>go()</script>",
+    filename: "locked.html",
+  });
+  registry.publish({
+    ingested: ing,
+    title: "Locked",
+    sourceType: "content",
+    renderer: { options: { allowScripts: true } },
+  });
+
+  const frame = await get(`/frame/${ing.id}`);
+  assert.match(frame.headers.get("content-security-policy")!, /script-src 'none'/);
+  assert.doesNotMatch(await (await get("/p/locked")).text(), /allow-scripts/);
   cleanup();
 });
 
@@ -187,7 +209,9 @@ test("static folder serving with traversal protection", async () => {
 
   const home = await get(`/frame/${ing.id}/`);
   assert.equal(home.status, 200);
+  assert.doesNotMatch(home.headers.get("content-security-policy")!, /script-src 'none'/);
   assert.match(await home.text(), /site home/);
+  assert.match(await (await get("/p/site")).text(), /sandbox="[^"]*allow-scripts[^"]*"/);
 
   const css = await get(`/frame/${ing.id}/sub/style.css`);
   assert.equal(css.status, 200);

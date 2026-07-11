@@ -54,7 +54,15 @@ const publishInput = {
     .object({
       name: z.string().optional(),
       options: z
-        .object({ allowScripts: z.boolean().optional().describe("Allow scripts in HTML previews (off by default)") })
+        .object({
+          allowScripts: z
+            .boolean()
+            .optional()
+            .describe(
+              "Override script execution for this artifact. HTML and folder previews allow scripts by default; " +
+                "false disables them. Server config stripScripts=true always disables them."
+            ),
+        })
         .passthrough()
         .optional(),
     })

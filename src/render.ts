@@ -1,8 +1,8 @@
 import { markdownToHtml } from "satteri";
-import type { Artifact, Rendered } from "./types.ts";
+import type { Artifact, Config, Rendered } from "./types.ts";
 
-// Rendered content is always embedded via a sandboxed iframe; scripts stay
-// blocked by CSP unless the artifact opted in with renderer.options.allowScripts.
+// Rendered content is always embedded via a sandboxed iframe. HTML artifacts
+// and static folders run scripts by default; other kinds stay blocked.
 export const FRAME_CSP =
   "default-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self'; script-src 'none'";
 
@@ -14,25 +14,30 @@ export function mermaidCsp(nonce: string): string {
   return `default-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'nonce-${nonce}'`;
 }
 
-type RendererCarrier = Pick<Artifact, "renderer">;
+type RendererCarrier = Pick<Artifact, "kind" | "renderer">;
+type ScriptConfig = Pick<Config, "stripScripts">;
 
-export function allowsScripts(artifact: RendererCarrier): boolean {
-  return artifact.renderer?.options?.allowScripts === true;
+export function allowsScripts(artifact: RendererCarrier, config: ScriptConfig): boolean {
+  if (config.stripScripts) return false;
+  const override = artifact.renderer?.options?.allowScripts;
+  if (typeof override === "boolean") return override;
+  return artifact.kind === "html" || artifact.kind === "static-folder";
 }
 
-export function cspFor(artifact: RendererCarrier): string {
-  return allowsScripts(artifact) ? FRAME_CSP_SCRIPTS : FRAME_CSP;
+export function cspFor(artifact: RendererCarrier, config: ScriptConfig): string {
+  return allowsScripts(artifact, config) ? FRAME_CSP_SCRIPTS : FRAME_CSP;
 }
 
 // Popups escape the sandbox so external links can open in a real tab
-// (framed navigation is refused by most sites); scripts stay opt-in.
+// (framed navigation is refused by most sites). Scripts never grant the frame
+// same-origin access.
 // Top navigation (click-gated) lets folder listings move the address bar
 // so reload keeps the place.
 const SANDBOX_BASE =
   "allow-downloads allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation";
 
-export function sandboxFor(artifact: RendererCarrier): string {
-  return allowsScripts(artifact) ? `${SANDBOX_BASE} allow-scripts` : SANDBOX_BASE;
+export function sandboxFor(artifact: RendererCarrier, config: ScriptConfig): string {
+  return allowsScripts(artifact, config) ? `${SANDBOX_BASE} allow-scripts` : SANDBOX_BASE;
 }
 
 export async function renderArtifact(artifact: Artifact, raw: Buffer): Promise<Rendered> {

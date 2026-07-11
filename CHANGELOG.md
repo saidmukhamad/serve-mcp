@@ -4,6 +4,9 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Changed
+- HTML artifacts and static folders now run inline and same-shelf JavaScript by default. Set the new `stripScripts` config option (or `SERVE_MCP_STRIP_SCRIPTS`) to `true` to force scripts off server-wide; `renderer.options.allowScripts: false` still disables scripts for one artifact.
+
 ## [0.0.9] - 2026-07-08
 
 ### Added

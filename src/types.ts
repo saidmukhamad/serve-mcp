@@ -85,6 +85,8 @@ export interface Config {
   baseUrlExplicit: boolean;
   /** Roots that path/folder publishing may read from; undefined = anywhere readable. */
   allowedRoots?: string[];
+  /** Force JavaScript off in HTML and static-folder previews. */
+  stripScripts: boolean;
 }
 
 export interface Rendered {

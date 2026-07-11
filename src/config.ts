@@ -10,6 +10,7 @@ export interface ConfigOverrides {
   dataDir?: string;
   baseUrl?: string;
   allowedRoots?: string[];
+  stripScripts?: boolean | string;
 }
 
 interface ConfigFile {
@@ -17,6 +18,7 @@ interface ConfigFile {
   port?: number | string;
   baseUrl?: string;
   allowedRoots?: string[];
+  stripScripts?: boolean;
 }
 
 /**
@@ -41,6 +43,10 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     overrides.allowedRoots ??
     process.env.SERVE_MCP_ALLOWED_ROOTS?.split(":").filter(Boolean) ??
     file.allowedRoots;
+  const stripScripts = parseBoolean(
+    overrides.stripScripts ?? process.env.SERVE_MCP_STRIP_SCRIPTS ?? file.stripScripts ?? false,
+    "stripScripts"
+  );
 
   return {
     host,
@@ -49,10 +55,11 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     baseUrl: explicit ?? (port ? `http://${advertiseHost(host)}:${port}` : null),
     baseUrlExplicit: Boolean(explicit),
     allowedRoots: allowedRoots?.map(expandHome),
+    stripScripts,
   };
 }
 
-export const CONFIG_KEYS = ["host", "port", "baseUrl"] as const;
+export const CONFIG_KEYS = ["host", "port", "baseUrl", "stripScripts"] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
 export function configFilePath(dataDir: string): string {
@@ -67,6 +74,8 @@ export function setConfigValue(dataDir: string, key: ConfigKey, value: string): 
     const port = Number(value);
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`invalid port: ${value}`);
     file.port = port;
+  } else if (key === "stripScripts") {
+    file.stripScripts = parseBoolean(value, key);
   } else {
     file[key] = value;
   }
@@ -84,6 +93,25 @@ function readConfigFile(dataDir: string): ConfigFile {
     }
     return {};
   }
+}
+
+function parseBoolean(value: unknown, key: string): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    switch (value.trim().toLowerCase()) {
+      case "true":
+      case "1":
+      case "yes":
+      case "on":
+        return true;
+      case "false":
+      case "0":
+      case "no":
+      case "off":
+        return false;
+    }
+  }
+  throw new Error(`invalid ${key}: ${String(value)} (expected true or false)`);
 }
 
 export function baseUrlOf(config: Config): string {

@@ -16,6 +16,7 @@ test("loadConfig: explicit port builds baseUrl, no port means ephemeral", () => 
   const fixed = loadConfig({ dataDir: "/tmp/x", host: "127.0.0.1", port: 8080 });
   assert.equal(fixed.port, 8080);
   assert.equal(fixed.baseUrl, "http://127.0.0.1:8080");
+  assert.equal(fixed.stripScripts, false, "HTML scripts run by default");
 
   const ephemeral = loadConfig({ dataDir: "/tmp/x", host: "127.0.0.1" });
   assert.equal(ephemeral.port, null);
@@ -29,24 +30,36 @@ test("loadConfig: config.json in dataDir applies, env and flags override it", ()
   const dataDir = fs.mkdtempSync("/tmp/serve-mcp-cfg-");
   fs.writeFileSync(
     `${dataDir}/config.json`,
-    JSON.stringify({ host: "0.0.0.0", port: 7444, allowedRoots: ["/srv/artifacts"] })
+    JSON.stringify({
+      host: "0.0.0.0",
+      port: 7444,
+      allowedRoots: ["/srv/artifacts"],
+      stripScripts: true,
+    })
   );
 
   const fromFile = loadConfig({ dataDir });
   assert.equal(fromFile.host, "0.0.0.0");
   assert.equal(fromFile.port, 7444);
   assert.deepEqual(fromFile.allowedRoots, ["/srv/artifacts"]);
+  assert.equal(fromFile.stripScripts, true);
 
-  const flagWins = loadConfig({ dataDir, host: "127.0.0.1", port: 9000 });
+  const flagWins = loadConfig({ dataDir, host: "127.0.0.1", port: 9000, stripScripts: false });
   assert.equal(flagWins.host, "127.0.0.1");
   assert.equal(flagWins.port, 9000);
+  assert.equal(flagWins.stripScripts, false);
 
   process.env.SERVE_MCP_HOST = "192.168.1.5";
+  process.env.SERVE_MCP_STRIP_SCRIPTS = "false";
   try {
     assert.equal(loadConfig({ dataDir }).host, "192.168.1.5", "env beats file");
+    assert.equal(loadConfig({ dataDir }).stripScripts, false, "env beats file");
   } finally {
     delete process.env.SERVE_MCP_HOST;
+    delete process.env.SERVE_MCP_STRIP_SCRIPTS;
   }
+
+  assert.throws(() => loadConfig({ dataDir, stripScripts: "sometimes" }));
 
   fs.writeFileSync(`${dataDir}/config.json`, "not json{");
   assert.equal(loadConfig({ dataDir }).host, "127.0.0.1", "broken file falls back to defaults");
@@ -58,16 +71,21 @@ test("setConfigValue: writes config.json, empty value unsets, invalid port rejec
 
   setConfigValue(dataDir, "host", "0.0.0.0");
   setConfigValue(dataDir, "port", "7331");
+  setConfigValue(dataDir, "stripScripts", "true");
   const written = JSON.parse(fs.readFileSync(configFilePath(dataDir), "utf8"));
-  assert.deepEqual(written, { host: "0.0.0.0", port: 7331 });
+  assert.deepEqual(written, { host: "0.0.0.0", port: 7331, stripScripts: true });
   assert.equal(loadConfig({ dataDir }).host, "0.0.0.0");
   assert.equal(loadConfig({ dataDir }).port, 7331);
+  assert.equal(loadConfig({ dataDir }).stripScripts, true);
 
   setConfigValue(dataDir, "host", "");
   assert.equal(loadConfig({ dataDir }).host, "127.0.0.1");
+  setConfigValue(dataDir, "stripScripts", "");
+  assert.equal(loadConfig({ dataDir }).stripScripts, false);
 
   assert.throws(() => setConfigValue(dataDir, "port", "banana"));
   assert.throws(() => setConfigValue(dataDir, "port", "70000"));
+  assert.throws(() => setConfigValue(dataDir, "stripScripts", "sometimes"));
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
